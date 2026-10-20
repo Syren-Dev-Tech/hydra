@@ -3,49 +3,40 @@ package com.github.syren_dev_tech.hydra.mixin.client;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import net.minecraft.client.renderer.texture.*;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.SimpleTexture;
+import net.minecraft.client.renderer.texture.TextureManager;
+import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import com.github.syren_dev_tech.hydra.renderer.texture.HydraAnimatedTexture;
+import com.github.syren_dev_tech.hydra.cache.texture.AnimatableTexture;
 
-/// Injection into TextureManager's access point for runtime-derived textures to allow Hydra to swap them out with `HydraAnimatedTexture`
-/// for animated texture purposes
-///
-/// Because HydraAnimatedTexture extends [SimpleTexture][net.minecraft.client.renderer.texture.SimpleTexture], the replacement should be seamless
+/**
+ * Injection into TextureManager's access point for runtime-derived textures to allow Hydra to swap them out with {@link AnimatableTexture} for animated texture purposes
+ * <p>
+ * Because AnimatedTexture extends {@link net.minecraft.client.renderer.texture.SimpleTexture SimpleTexture}, the replacement should be seamless
+ */
 @Mixin(value = TextureManager.class, priority = 2000)
 public abstract class TextureManagerMixin {
-	@Shadow protected abstract TextureContents loadContentsSafe(Identifier textureId, ReloadableTexture texture);
+	@Shadow
+	public abstract void register(ResourceLocation path, AbstractTexture texture);
 
-	@Shadow public abstract void register(Identifier path, AbstractTexture texture);
-
-    /// Swap out the vanilla SimpleTexture for a HydraAnimatedTexture if the texture is animated
-    @WrapOperation(method = "getTexture(Lnet/minecraft/resources/Identifier;)Lnet/minecraft/client/renderer/texture/AbstractTexture;",
-			at = @At(value = "NEW", target = "(Lnet/minecraft/resources/Identifier;)Lnet/minecraft/client/renderer/texture/SimpleTexture;"),
+	@WrapOperation(method = "getTexture(Lnet/minecraft/resources/ResourceLocation;)Lnet/minecraft/client/renderer/texture/AbstractTexture;",
+			at = @At(value = "NEW", target = "(Lnet/minecraft/resources/ResourceLocation;)Lnet/minecraft/client/renderer/texture/SimpleTexture;"),
 			require = 0)
-	private SimpleTexture hydra$replaceAnimatableTexture(Identifier location, Operation<SimpleTexture> original) {
-		HydraAnimatedTexture animatableTexture = new HydraAnimatedTexture(location);
+	private SimpleTexture hydra$replaceAnimatableTexture(ResourceLocation location, Operation<SimpleTexture> original) {
+		AnimatableTexture animatableTexture = new AnimatableTexture(location);
 
-		TextureContents contents = loadContentsSafe(location, animatableTexture);
+		register(location, animatableTexture);
 
-		if (animatableTexture.isAnimated()) {
-			animatableTexture.apply(contents);
-			register(location, animatableTexture);
-
-			return animatableTexture;
-		}
-
-		animatableTexture.close();
-
-		return original.call(location);
+		return animatableTexture.isAnimated() ? animatableTexture : new SimpleTexture(location);
 	}
 
-    /// Force-cancel texture registration if texture is HydraAnimatedTexture, since we already did it in `hydra$replaceAnimatableTexture`
-    @WrapWithCondition(method = "getTexture(Lnet/minecraft/resources/Identifier;)Lnet/minecraft/client/renderer/texture/AbstractTexture;",
-			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/texture/TextureManager;registerAndLoad(Lnet/minecraft/resources/Identifier;Lnet/minecraft/client/renderer/texture/ReloadableTexture;)V"),
+	@WrapWithCondition(method = "getTexture(Lnet/minecraft/resources/ResourceLocation;)Lnet/minecraft/client/renderer/texture/AbstractTexture;",
+			at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/texture/TextureManager;register(Lnet/minecraft/resources/ResourceLocation;Lnet/minecraft/client/renderer/texture/AbstractTexture;)V"),
 			require = 0)
-	private boolean hydra$skipAnimatableTextureRegistration(TextureManager textureManager, Identifier id, ReloadableTexture texture) {
-		return !(texture instanceof HydraAnimatedTexture);
+	private boolean hydra$skipAnimatableTextureRegistration(TextureManager textureManager, ResourceLocation location, AbstractTexture texture) {
+		return !(texture instanceof AnimatableTexture);
 	}
 }

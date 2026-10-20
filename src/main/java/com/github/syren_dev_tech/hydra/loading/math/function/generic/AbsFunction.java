@@ -1,15 +1,16 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.generic;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the absolute (non-negative) equivalent of the input value
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the absolute (non-negative) equivalent of the input value
+ */
 public final class AbsFunction extends MathFunction {
     private final MathValue value;
 
@@ -25,8 +26,8 @@ public final class AbsFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return Math.abs(this.value.get(controllerState));
+    public double compute() {
+        return Math.abs(this.value.get());
     }
 
     @Override

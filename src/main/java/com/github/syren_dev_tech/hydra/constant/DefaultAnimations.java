@@ -1,32 +1,29 @@
 package com.github.syren_dev_tech.hydra.constant;
 
-import com.github.syren_dev_tech.hydra.animatable.*;
-import com.github.syren_dev_tech.hydra.animation.AnimationController;
-import com.github.syren_dev_tech.hydra.animation.RawAnimation;
-import com.github.syren_dev_tech.hydra.animation.object.PlayState;
-import com.github.syren_dev_tech.hydra.animation.state.AnimationTest;
-import com.github.syren_dev_tech.hydra.renderer.base.BoneSnapshots;
-import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderState;
-import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderer;
-import com.github.syren_dev_tech.hydra.renderer.base.RenderPassInfo;
-import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
-import org.jspecify.annotations.Nullable;
+import com.github.syren_dev_tech.hydra.animatable.HydraAnimatable;
+import com.github.syren_dev_tech.hydra.animation.AnimationController;
+import com.github.syren_dev_tech.hydra.animation.AnimationState;
+import com.github.syren_dev_tech.hydra.animation.RawAnimation;
+import com.github.syren_dev_tech.hydra.animation.PlayState;
 
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
-/// Optionally usable class that holds constants for recommended animation paths
-///
-/// Using these won't affect much, but it may help keep some consistency in animation namings
-///
-/// Additionally, it encourages use of cached [RawAnimations][RawAnimation], to reduce overheads.
+/**
+ * Optionally usable class that holds constants for recommended animation paths
+ * <p>
+ * Using these won't affect much, but it may help keep some consistency in animation namings
+ * <p>
+ * Additionally, it encourages use of cached {@link RawAnimation RawAnimations}, to reduce overheads.
+ */
 public final class DefaultAnimations {
 	public static final RawAnimation ITEM_ON_USE = RawAnimation.begin().thenPlay("item.use");
 
 	public static final RawAnimation IDLE = RawAnimation.begin().thenLoop("misc.idle");
-	public static final RawAnimation IDLE_FLYING = RawAnimation.begin().thenLoop("misc.idle.flying");
+    public static final RawAnimation IDLE_FLYING = RawAnimation.begin().thenLoop("misc.idle.flying");
 	public static final RawAnimation LIVING = RawAnimation.begin().thenLoop("misc.living");
 	public static final RawAnimation SPAWN = RawAnimation.begin().thenPlay("misc.spawn");
 	public static final RawAnimation DIE = RawAnimation.begin().thenPlay("misc.die");
@@ -35,7 +32,7 @@ public final class DefaultAnimations {
 	public static final RawAnimation REST = RawAnimation.begin().thenPlay("misc.rest");
 	public static final RawAnimation SIT = RawAnimation.begin().thenPlayAndHold("misc.sit");
 
-    public static final RawAnimation WALK = RawAnimation.begin().thenLoop("move.walk");
+	public static final RawAnimation WALK = RawAnimation.begin().thenLoop("move.walk");
 	public static final RawAnimation SWIM = RawAnimation.begin().thenLoop("move.swim");
 	public static final RawAnimation RUN = RawAnimation.begin().thenLoop("move.run");
 	public static final RawAnimation DRIVE = RawAnimation.begin().thenLoop("move.drive");
@@ -48,7 +45,7 @@ public final class DefaultAnimations {
 	public static final RawAnimation ATTACK_CAST = RawAnimation.begin().thenPlay("attack.cast");
 	public static final RawAnimation ATTACK_SWING = RawAnimation.begin().thenPlay("attack.swing");
 	public static final RawAnimation ATTACK_THROW = RawAnimation.begin().thenPlay("attack.throw");
-	public static final RawAnimation ATTACK_PUNCH = RawAnimation.begin().thenPlay("attack.punch");
+    public static final RawAnimation ATTACK_PUNCH = RawAnimation.begin().thenPlay("attack.punch");
 	public static final RawAnimation ATTACK_BITE = RawAnimation.begin().thenPlay("attack.bite");
 	public static final RawAnimation ATTACK_SLAM = RawAnimation.begin().thenPlay("attack.slam");
 	public static final RawAnimation ATTACK_STOMP = RawAnimation.begin().thenPlay("attack.stomp");
@@ -60,166 +57,205 @@ public final class DefaultAnimations {
 	public static final RawAnimation ATTACK_CHARGE_END = RawAnimation.begin().thenPlay("attack.charge_end");
 	public static final RawAnimation ATTACK_POWERUP = RawAnimation.begin().thenPlay("attack.powerup");
 
-    /// An AnimationController that does nothing, to be used for handling triggered animations that don't need to be on any other controller
-    ///
-    /// This should **<u>only</u>** be used where you need a controller for some triggered animations but don't want them to interfere with any other animations
-    public static <T extends GeoAnimatable> AnimationController<T> triggerOnlyController() {
-        return new AnimationController<>("Actions", test -> PlayState.STOP);
+    /**
+     * An AnimationController that does nothing, to be used for handling triggered animations that don't need to be on any other controller
+     * <p>
+     * This should <b><u>only</u></b> be used where you need a controller for some triggered animations, but don't want them to interfere with any other animations
+     */
+    public static <T extends HydraAnimatable> AnimationController<T> triggerOnlyController(T animatable) {
+        return new AnimationController<>(animatable, "Actions", 0, state -> PlayState.STOP);
     }
 
-	/// A basic predicate-based [AnimationController] implementation
-	///
-	/// Return a RawAnimation based on the input [AnimationTest], or null to stop the controller entirely
-	public static <T extends GeoAnimatable> AnimationController<T> basicPredicateController(Function<AnimationTest<T>, @Nullable RawAnimation> predicate) {
-		return new AnimationController<>("Generic", test -> {
-			RawAnimation result = predicate.apply(test);
+	/**
+	 * A basic predicate-based {@link AnimationController} implementation
+	 * <p>
+	 * Provide an {@code option A} {@link RawAnimation animation} and an {@code option B} animation, and use the predicate to determine which to play
+	 * <p>
+	 * Outcome table:
+	 * <pre>  true  -> Animation Option A
+	 * false -> Animation Option B
+	 * null  -> Stop Controller</pre>
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> basicPredicateController(T animatable, RawAnimation optionA, RawAnimation optionB, BiFunction<T, AnimationState<T>, Boolean> predicate) {
+		return new AnimationController<T>(animatable, "Generic", 10, state -> {
+			Boolean result = predicate.apply(animatable, state);
 
-			return result == null ? PlayState.STOP : test.setAndContinue(result);
+			if (result == null)
+				return PlayState.STOP;
+
+			return state.setAndContinue(result ? optionA : optionB);
 		});
 	}
 
-	/// Generic [living][DefaultAnimations#LIVING] controller
-	///
-	/// Continuously plays the living animation
-	public static <T extends GeoAnimatable> AnimationController<T> genericLivingController() {
-		return new AnimationController<>("Living", test -> test.setAndContinue(LIVING));
+	/**
+	 * Generic {@link DefaultAnimations#LIVING living} controller
+	 * <p>
+	 * Continuously plays the living animation
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> genericLivingController(T animatable) {
+		return new AnimationController<>(animatable, "Living", 10, state -> state.setAndContinue(LIVING));
 	}
 
-	/// Generic [die][DefaultAnimations#DIE] controller
-	///
-	/// Plays the death animation when dying
-	public static <T extends LivingEntity & GeoAnimatable> AnimationController<T> genericDeathController() {
-		return new AnimationController<>("Death", test -> test.getDataOrDefault(DataTickets.IS_DEAD_OR_DYING, false) ? test.setAndContinue(DIE) : PlayState.STOP);
+	/**
+	 * Generic {@link DefaultAnimations#DIE die} controller
+	 * <p>
+	 * Plays the death animation when dying
+	 */
+	public static <T extends LivingEntity & HydraAnimatable> AnimationController<T> genericDeathController(T animatable) {
+		return new AnimationController<>(animatable, "Death", 0, state -> state.getAnimatable().isDeadOrDying() ? state.setAndContinue(DIE) : PlayState.STOP);
 	}
 
-	/// Generic [idle][DefaultAnimations#IDLE] controller
-	///
-	/// Continuously plays the idle animation
-	public static <T extends GeoAnimatable> AnimationController<T> genericIdleController() {
-		return new AnimationController<>("Idle", test -> test.setAndContinue(IDLE));
+	/**
+	 * Generic {@link DefaultAnimations#IDLE idle} controller
+	 * <p>
+	 * Continuously plays the idle animation
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> genericIdleController(T animatable) {
+		return new AnimationController<T>(animatable, "Idle", 10, state -> state.setAndContinue(IDLE));
 	}
 
-	/// Generic [spawn][DefaultAnimations#SPAWN] controller
-	///
-	/// Plays the spawn animation as long as the current age of the animatable is {@literal <=} the value provided in `ticks`
-	///
-	/// For the `objectSupplier`, provide the relevant object for the animatable being animated
-	///
-	/// Recommended:
-	///
-	///   - [GeoEntity][GeoEntity]: test -> animatable
-	///   - [GeoBlockEntity][GeoBlockEntity]: test -> animatable
-	///   - [GeoReplacedEntity][GeoReplacedEntity]: test -> test.getData(DataTickets.ENTITY)
-	///   - [GeoItem][GeoItem]: test -> test.getData(DataTickets.ITEMSTACK)
-	///   - `GeoArmor`: test -> test.getData(DataTickets.ENTITY)
-	///
-	///
-	/// @param spawnTicks The number of ticks the animation should run for. After this value is surpassed, the animation will no longer play
-	public static <T extends GeoAnimatable> AnimationController<T> getSpawnController(int spawnTicks) {
-		return new AnimationController<>("Spawn", test ->
-				test.renderState().getAnimatableAge() <= spawnTicks ? test.setAndContinue(DefaultAnimations.SPAWN) : PlayState.STOP);
-	}
-
-	/// Generic [walk][DefaultAnimations#WALK] controller
-	///
-	/// Will play the walk animation if the animatable is considered moving, or stop if not.
-	public static <T extends GeoAnimatable> AnimationController<T> genericWalkController() {
-		return new AnimationController<>("Walk", test -> test.isMoving() ? test.setAndContinue(WALK) : PlayState.STOP);
-	}
-
-	/// Generic attack controller
-	///
-	/// Plays an attack animation if the animatable is [LivingEntity#isSwinging()]
-	///
-	/// Resets the animation each time it stops, ready for the next swing
-	///
-	/// @param attackAnimation The attack animation to play (E.G., swipe, strike, stomp, swing, etc.)
-	/// @return A new [AnimationController] instance to use
-	public static <T extends LivingEntity & GeoAnimatable> AnimationController<T> genericAttackAnimation(RawAnimation attackAnimation) {
-		return new AnimationController<>("Attack", test -> {
-			if (test.getDataOrDefault(DataTickets.SWINGING_ARM, false))
-				return test.setAndContinue(attackAnimation);
+	/**
+	 * Generic {@link DefaultAnimations#SPAWN spawn} controller
+	 * <p>
+	 * Plays the spawn animation as long as the current {@link HydraAnimatable#getTick tick} of the animatable is {@literal <=} the value provided in {@code ticks}
+	 * <p>
+	 * For the {@code objectSupplier}, provide the relevant object for the animatable being animated
+	 * </p>
+	 * Recommended:
+	 * <ul>
+	 *     <li>{@link com.github.syren_dev_tech.hydra.animatable.HydraEntity HydraEntity}: state -> animatable</li>
+	 *     <li>{@link com.github.syren_dev_tech.hydra.animatable.HydraBlockEntity HydraBlockEntity}: state -> animatable</li>
+	 *     <li>{@link com.github.syren_dev_tech.hydra.animatable.HydraReplacedEntity HydraReplacedEntity}: state -> state.getData(DataTickets.ENTITY)</li>
+	 *     <li>{@link com.github.syren_dev_tech.hydra.animatable.HydraItem HydraItem}: state -> state.getData(DataTickets.ITEMSTACK)</li>
+	 *     <li>{@code HydraArmor}: state -> state.getData(DataTickets.ENTITY)</li>
+	 * </ul>
+	 *
+	 * @param animatable The animatable the animation is for
+	 * @param objectSupplier The supplier of the associated object for the {@link HydraAnimatable#getTick} call
+	 * @param ticks The number of ticks the animation should run for. After this value is surpassed, the animation will no longer play
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> getSpawnController(T animatable, Function<AnimationState<T>, Object> objectSupplier, int ticks) {
+		return new AnimationController<T>(animatable, "Spawn", 0, state -> {
+			if (animatable.getTick(objectSupplier.apply(state)) <= ticks)
+				return state.setAndContinue(DefaultAnimations.SPAWN);
 
 			return PlayState.STOP;
 		});
 	}
 
-	/// Generic [walk][DefaultAnimations#WALK] + [idle][DefaultAnimations#IDLE] controller
-	///
-	/// Will play the walk animation if the animatable is considered moving, or idle if not
-	public static <T extends GeoAnimatable> AnimationController<T> genericWalkIdleController() {
-		return new AnimationController<>("Walk/Idle", test -> test.setAndContinue(test.isMoving() ? WALK : IDLE));
+	/**
+	 * Generic {@link DefaultAnimations#WALK walk} controller
+	 * <p>
+	 * Will play the walk animation if the animatable is considered moving, or stop if not.
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> genericWalkController(T animatable) {
+		return new AnimationController<T>(animatable, "Walk", 0, state -> {
+			if (state.isMoving())
+				return state.setAndContinue(WALK);
+
+			return PlayState.STOP;
+		});
 	}
 
-	/// Generic [swim][DefaultAnimations#SWIM] controller
-	///
-	/// Will play the swim animation if the animatable is considered moving, or stop if not.
-	public static <T extends GeoAnimatable> AnimationController<T> genericSwimController() {
-		return new AnimationController<>("Swim", test -> test.isMoving() ? test.setAndContinue(SWIM) : PlayState.STOP);
+	/**
+	 * Generic attack controller
+	 * <p>
+	 * Plays an attack animation if the animatable is {@link net.minecraft.world.entity.LivingEntity#swinging}
+	 * <p>
+	 * Resets the animation each time it stops, ready for the next swing
+	 *
+	 * @param animatable The entity that should swing
+	 * @param attackAnimation The attack animation to play (E.G. swipe, strike, stomp, swing, etc)
+	 * @return A new {@link AnimationController} instance to use
+	 */
+	public static <T extends LivingEntity & HydraAnimatable> AnimationController<T> genericAttackAnimation(T animatable, RawAnimation attackAnimation) {
+		return new AnimationController<>(animatable, "Attack", 5, state -> {
+			if (animatable.swinging)
+				return state.setAndContinue(attackAnimation);
+
+			state.getController().forceAnimationReset();
+
+			return PlayState.STOP;
+		});
 	}
 
-	/// Generic [swim][DefaultAnimations#SWIM] + [idle][DefaultAnimations#IDLE] controller
-	///
-	/// Will play the swim animation if the animatable is considered moving, or idle if not
-	public static <T extends GeoAnimatable> AnimationController<T> genericSwimIdleController() {
-		return new AnimationController<>("Swim/Idle", test -> test.setAndContinue(test.isMoving() ? SWIM : IDLE));
+	/**
+	 * Generic {@link DefaultAnimations#WALK walk} + {@link DefaultAnimations#IDLE idle} controller
+	 * <p>
+	 * Will play the walk animation if the animatable is considered moving, or idle if not
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> genericWalkIdleController(T animatable) {
+		return new AnimationController<T>(animatable, "Walk/Idle", 0, state -> state.setAndContinue(state.isMoving() ? WALK : IDLE));
 	}
 
-	/// Generic [walk][DefaultAnimations#FLY] controller
-	///
-	/// Will play the fly animation if the animatable is considered moving, or stop if not.
-	public static <T extends GeoAnimatable> AnimationController<T> genericFlyController() {
-		return new AnimationController<>("Fly", test -> test.isMoving() ? test.setAndContinue(FLY) : PlayState.STOP);
+	/**
+	 * Generic {@link DefaultAnimations#SWIM swim} controller
+	 * <p>
+	 * Will play the swim animation if the animatable is considered moving, or stop if not.
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> genericSwimController(T entity) {
+		return new AnimationController<T>(entity, "Swim", 0, state -> {
+			if (state.isMoving())
+				return state.setAndContinue(SWIM);
+
+			return PlayState.STOP;
+		});
 	}
 
-	/// Generic [walk][DefaultAnimations#FLY] + [idle][DefaultAnimations#IDLE] controller
-	///
-	/// Will play the walk animation if the animatable is considered moving, or idle if not
-	public static <T extends GeoAnimatable> AnimationController<T> genericFlyIdleController() {
-		return new AnimationController<>("Fly/Idle", test -> test.setAndContinue(test.isMoving() ? FLY : IDLE));
+	/**
+	 * Generic {@link DefaultAnimations#SWIM swim} + {@link DefaultAnimations#IDLE idle} controller
+	 * <p>
+	 * Will play the swim animation if the animatable is considered moving, or idle if not
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> genericSwimIdleController(T animatable) {
+		return new AnimationController<T>(animatable, "Swim/Idle", 0, state -> state.setAndContinue(state.isMoving() ? SWIM : IDLE));
 	}
 
-	/// Generic [fly][DefaultAnimations#FLY] + [walk][DefaultAnimations#WALK] + [idle][DefaultAnimations#IDLE]  + [fly-idle][DefaultAnimations#IDLE_FLYING] controller
-	///
-	/// Will play a walk or flying animation if moving, or an equivalent idle animation if not, depending on if the entity is on the ground or not
-	public static <T extends GeoAnimatable> AnimationController<T> genericWalkFlyIdleController(Mob entity) {
-        return new AnimationController<>("Walk/Fly/Idle", 0, state -> {
+	/**
+	 * Generic {@link DefaultAnimations#FLY walk} controller
+	 * <p>
+	 * Will play the fly animation if the animatable is considered moving, or stop if not.
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> genericFlyController(T animatable) {
+		return new AnimationController<T>(animatable, "Fly", 0, state -> state.setAndContinue(FLY));
+	}
+
+	/**
+	 * Generic {@link DefaultAnimations#FLY walk} + {@link DefaultAnimations#IDLE idle} controller
+	 * <p>
+	 * Will play the walk animation if the animatable is considered moving, or idle if not
+	 */
+	public static <T extends HydraAnimatable> AnimationController<T> genericFlyIdleController(T animatable) {
+		return new AnimationController<T>(animatable, "Fly/Idle", 0, state -> state.setAndContinue(state.isMoving() ? FLY : IDLE));
+	}
+
+    /**
+     * Generic {@link DefaultAnimations#FLY fly} + {@link DefaultAnimations#WALK walk} + {@link DefaultAnimations#IDLE idle}  + {@link DefaultAnimations#IDLE_FLYING fly-idle} controller
+     * <p>
+     * Will play a walk or flying animation if moving, or an equivalent idle animation if not, depending on if the entity is on the ground or not
+     */
+    public static <T extends Mob & HydraAnimatable> AnimationController<T> genericWalkFlyIdleController(T entity) {
+        return new AnimationController<>(entity, "Walk/Fly/Idle", 0, state -> {
             if (entity.onGround() || (!entity.isNoAi() && entity.getBlockPosBelowThatAffectsMyMovement().getY() + 1 == entity.getY()))
                 return state.setAndContinue(state.isMoving() ? DefaultAnimations.WALK : DefaultAnimations.IDLE);
 
             return state.setAndContinue(state.isMoving() ? DefaultAnimations.FLY : DefaultAnimations.IDLE_FLYING);
         });
-	}
+    }
 
-	/// Generic [walk][DefaultAnimations#WALK] + [run][DefaultAnimations#RUN] + [idle][DefaultAnimations#IDLE] controller
-	///
-	/// If the entity is considered moving, will either walk or run depending on the [Entity#isSprinting()] method, otherwise it will idle
-	public static <T extends Entity & GeoAnimatable> AnimationController<T> genericWalkRunIdleController() {
-		return new AnimationController<>("Walk/Run/Idle", test -> {
-			if (test.isMoving())
-				return test.setAndContinue(test.getDataOrDefault(DataTickets.SPRINTING, false) ? RUN : WALK);
-
-			return test.setAndContinue(IDLE);
+	/**
+	 * Generic {@link DefaultAnimations#WALK walk} + {@link DefaultAnimations#RUN run} + {@link DefaultAnimations#IDLE idle} controller
+	 * <p>
+	 * If the entity is considered moving, will either walk or run depending on the {@link Entity#isSprinting()} method, otherwise it will idle
+	 */
+	public static <T extends Entity & HydraAnimatable> AnimationController<T> genericWalkRunIdleController(T entity) {
+		return new AnimationController<T>(entity, "Walk/Run/Idle", 0, state -> {
+			if (state.isMoving()) {
+				return state.setAndContinue(entity.isSprinting() ? RUN : WALK);
+			}
+			else {
+				return state.setAndContinue(IDLE);
+			}
 		});
 	}
-
-    /// Hardcoded head rotation to look towards an entity's facing direction.
-	///
-	/// You would typically call this in [GeoRenderer#adjustModelBonesForRender]
-    ///
-    /// Consider replacing this with an `AnimationController` animation using the below values:
-    ///
-    /// `xrot: math.to_rad(-query.head_x_rotation)`
-    /// `yrot: math.to_rad(-query.head_y_rotation)`
-    ///
-    /// @param headBone The name of the bone to rotate
-    public static <R extends GeoRenderState> void hardcodedHeadRotation(RenderPassInfo<R> renderPassInfo, BoneSnapshots snapshots, String headBone) {
-        snapshots.get(headBone).ifPresent(bone -> {
-            float pitch = renderPassInfo.getOrDefaultHydraData(DataTickets.ENTITY_PITCH, 0f);
-            float yaw = renderPassInfo.getOrDefaultHydraData(DataTickets.ENTITY_YAW, 0f);
-
-            bone.setRotX(-pitch * Mth.DEG_TO_RAD);
-            bone.setRotY(-yaw * Mth.DEG_TO_RAD);
-        });
-    }
 }

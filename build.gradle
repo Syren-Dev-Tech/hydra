@@ -1,107 +1,244 @@
-plugins {
-    id 'java'
-    id 'maven-publish'
-    alias(libs.plugins.moddevgradle)
-    alias(libs.plugins.minotaur)
-    alias(libs.plugins.curseforgegradle)
+buildscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        maven { url = 'https://maven.neoforged.net/releases' }
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        mavenLocal()
+    }
+    dependencies {
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+    }
 }
 
-group = 'com.github.syren_dev_tech.hydra'
-version = '5.5.7' // Simplified version
+plugins {
+    id 'java'
+    id 'idea'
+    id 'groovy'
+    id 'eclipse'
+    id 'java-library'
+    id 'maven-publish'
+    // id 'fabric-loom' version "${loom_version}" apply false
+    // id 'net.minecraftforge.gradle' version '[6.0,6.2)' apply false
+    id 'org.parchmentmc.librarian.forgegradle' version '1.+' apply false
+    // id 'org.spongepowered.mixin' version '0.7.+' apply false
+    id 'net.neoforged.moddev' version '2.0.140' apply false
+}
+
+group = mod_group_id
+version = mod_version
+
+// Set temp variable for artifact ID
+def artifact_id = ""
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21) // Using a common version, adjust if needed
+        languageVersion = JavaLanguageVersion.of(21)
     }
     withSourcesJar()
     withJavadocJar()
 }
 
-neoForge {
-    // Accessing version from catalog. If it fails, it might need adjustment.
-    // For now, I'll use the version from the catalog if possible.
-    version = libs.versions.neoforge.get().requiredVersion
+def isForge = project.findProperty('forge') == 'true'
+def isFabric = project.findProperty('fabric') == 'true'
+def isNeoForge = project.findProperty('neoforge') == 'true'
 
-    accessTransformers.files.setFrom(file("src/main/resources/META-INF/accesstransformer.cfg"))
-    validateAccessTransformers = true
+if (isForge) {
+    println "Building with Forge"
 
-    interfaceInjectionData {
-        from(file("src/main/resources/META-INF/interface_injections.json"))
-        publish(file("src/main/resources/META-INF/interface_injections.json"))
+    apply plugin: 'net.minecraftforge.gradle'
+    apply plugin: 'org.spongepowered.mixin'
+    apply plugin: 'org.parchmentmc.librarian.forgegradle'
+
+    // Exclude files marked as "fabric only"
+    sourceSets.main.java.exclude '**/*_Fabric.java'
+    artifact_id = "${mod_id}_forge"
+
+    dependencies {
+        minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+        implementation 'org.slf4j:slf4j-api:2.0.17'
+        implementation 'com.electronwill.night-config:core:3.8.3'
+        implementation 'org.jspecify:jspecify:0.3.0'
     }
 
-    runs {
-        configureEach {
-            logLevel = org.slf4j.event.Level.DEBUG
+    minecraft {
+        mappings channel: mapping_channel, version: "${parchment_version}-${minecraft_version}"
+        runs {
+            client {
+                workingDirectory project.file('run')
+                property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+                property 'forge.logging.console.level', 'debug'
+            }
+        }
+    }
+}
+else if (isFabric) {
+    println "Building with Fabric"
+
+    apply plugin: 'fabric-loom'
+
+    // Exclude files marked as "forge only"
+    sourceSets.main.java.exclude '**/*_Forge.java'
+    artifact_id = "${mod_id}_fabric"
+
+    dependencies {
+        minecraft "com.mojang:minecraft:${minecraft_version}"
+        mappings loom.layered() {
+            officialMojangMappings()
+            parchment("org.parchmentmc.data:parchment-${minecraft_version}:${parchment_version}@zip")
+        }
+        modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+        modImplementation "net.fabricmc:fabric-api:${fabric_api_version}"
+        implementation 'org.slf4j:slf4j-api:2.0.17'
+        implementation 'com.electronwill.night-config:core:3.8.3'
+        implementation 'org.jspecify:jspecify:0.3.0'
+    }
+
+    loom {
+        runs {
+            client {
+                property 'fabric.debug', 'true'
+            }
+        }
+    }
+}
+else {
+    println "Building with NeoForge"
+
+    apply plugin: 'net.neoforged.moddev'
+
+    // Exclude files marked as "fabric only"
+    sourceSets.main.java.exclude '**/*_Fabric.java'
+    artifact_id = "${mod_id}_neoforge"
+
+    dependencies {
+        implementation("net.neoforged:neoforge:${project.neoforge_version}") {
+            attributes {
+                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_API))
+            }
+        }
+        implementation 'org.slf4j:slf4j-api:2.0.9'
+        implementation 'com.electronwill.night-config:core:3.8.3'
+        implementation 'org.jspecify:jspecify:0.3.0'
+    }
+
+    neoForge {
+        // Specify the version of NeoForge to use.
+        version = project.neoforge_version
+
+        parchment {
+            mappingsVersion = project.parchment_version
+            minecraftVersion = project.minecraft_version
         }
 
-        mods {
-            create('hydra') {
-                sourceSet(sourceSets.main.get())
+        // This line is optional. Access Transformers are automatically detected
+        // accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
+
+        // Default run configurations.
+        // These can be tweaked, removed, as needed.
+        runs {
+            client {
+                client()
+
+                // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
+                systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            }
+
+            server {
+                server()
+                programArgument '--nogui'
+                systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            }
+
+            // This run config launches GameTestServer and runs all registered gametests, then exits.
+            // By default, the server will crash when no gametests are provided.
+            // The gametest system is also enabled by default for other run configs under the /test command.
+            gameTestServer {
+                type = "gameTestServer"
+                systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            }
+
+            data {
+                clientData()
+
+                // example of overriding the workingDirectory set in configureEach above, uncomment if you want to use it
+                // gameDirectory = project.file('run-data')
+
+                // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
+                programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+            }
+
+            // applies to all the run configs above
+            configureEach {
+                // Recommended logging data for a userdev environment
+                // The markers can be added/remove as needed separated by commas.
+                // "SCAN": For mods scan.
+                // "REGISTRIES": For firing of registry events.
+                // "REGISTRYDUMP": For getting the contents of all registries.
+                systemProperty 'forge.logging.markers', 'REGISTRIES'
+
+                // Recommended logging level for the console
+                // You can set various levels here.
+                // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
+                logLevel = org.slf4j.event.Level.DEBUG
             }
         }
 
-        register('client') {
-            client()
+        mods {
+            // define mod <-> source bindings
+            // these are used to tell the game which sources are for which mod
+            // mostly optional in a single mod project
+            // but multi mod projects should define one per mod
+            "${mod_id}" {
+                sourceSet(sourceSets.main)
+            }
         }
+    }
 
-        register('client2') {
-            client()
-            programArguments.addAll('--username', 'Player')
-        }
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs.add("--enable-preview")
+    }
 
-        register('server') {
-            server()
-            programArgument '--nogui'
-        }
+    tasks.withType(ProcessResources).configureEach {
+        var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neoforge_version,
+            neo_version_range      : neoforge_version_range,
+            loader_version_range   : neoforge_loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+            mod_authors            : mod_authors,
+            mod_description        : mod_description
+        ]
+        inputs.properties replaceProperties
     }
 }
 
-dependencies {
-    // Dependencies would go here
-}
-
-jar {
-    manifest {
-        attributes(
-            'Specification-Title': 'Hydra',
-            'Specification-Vendor': 'Hydra Authors',
-            'Specification-Version': version,
-            'Implementation-Title': 'Hydra',
-            'Implementation-Version': version,
-            'Implementation-Vendor': 'Hydra Authors',
-            'Built-On-Minecraft': libs.versions.minecraft.get().requiredVersion,
-            'MixinConfigs': 'hydra.mixins.json'
-        )
-    }
-}
-
-processResources {
-    inputs.property 'version', version
-    
-    filesMatching(['pack.mcmeta', 'fabric.mod.json', 'META-INF/neoforge.mods.toml', 'META-INF/mods.toml', '*.mixins.json']) {
-        expand(
-            version: version,
-            mod_id: 'hydra',
-            mod_display_name: 'Hydra',
-            mod_authors: 'Hydra Authors',
-            mod_contributors: 'Hydra Contributors',
-            mod_license: 'MIT',
-            mod_description: 'Hydra Lite',
-            minecraft_version: libs.versions.minecraft.get().requiredVersion
-        )
-    }
+repositories {
+    mavenCentral()
+    maven { url 'libraries.minecraft.net' }
+    maven { url 'https://maven.minecraftforge.net' }
+    maven { url 'https://repo.spongepowered.org/maven' }
+    maven { url 'https://maven.neoforged.net/' }
+    maven { url 'https://maven.fabricmc.net/' }
+    maven { url 'https://maven.parchmentmc.org/' }
 }
 
 publishing {
     publications {
-        mavenJava(MavenPublication) {
-            from components.java
+        register('mavenJava', MavenPublication) {
+            artifactId "${artifact_id}"
+            artifact jar
         }
-    }
-    repositories {
-        mavenLocal()
     }
 }
 
-// Minotaur and CurseForge publishing tasks can be added here if needed
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

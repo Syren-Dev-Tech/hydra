@@ -1,16 +1,17 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.misc;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 import com.github.syren_dev_tech.hydra.loading.math.value.Constant;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns <a href="https://en.wikipedia.org/wiki/Pi">PI</a>
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns <a href="https://en.wikipedia.org/wiki/Pi">PI</a>
+ */
 public final class PiFunction extends MathFunction {
     public PiFunction(MathValue... values) {
         super(values);
@@ -22,7 +23,7 @@ public final class PiFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
+    public double compute() {
         return Math.PI;
     }
 

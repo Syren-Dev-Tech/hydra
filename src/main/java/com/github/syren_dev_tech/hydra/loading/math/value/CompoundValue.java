@@ -1,48 +1,26 @@
 package com.github.syren_dev_tech.hydra.loading.math.value;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 
-import java.util.Set;
 import java.util.StringJoiner;
 
-/// [MathValue] value supplier
-///
-/// **Contract:**
-///
-/// Contains a collection of sub-expressions that evaluate before returning the last expression, or 0 if no return is defined.
-/// Sub-expressions have no bearing on the final return with exception for where they may be setting variable values
-public record CompoundValue(MathValue[] subValues, Set<Variable> usedVariables) implements MathValue {
-    public CompoundValue(MathValue[] subValues) {
-        this(subValues, MathValue.collectUsedVariables(subValues));
-    }
-
+/**
+ * {@link MathValue} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Contains a collection of sub-expressions that evaluate before returning the last expression, or 0 if no return is defined.
+ * Sub-expressions have no bearing on the final return with exception for where they may be setting variable values
+ */
+public record CompoundValue(MathValue[] subValues) implements MathValue {
     @Override
-    public double get(@Nullable ControllerState controllerState) {
+    public double get() {
         for (int i = 0; i < this.subValues.length - 1; i++) {
-            this.subValues[i].get(controllerState);
+            this.subValues[i].get();
         }
 
-        return this.subValues[this.subValues.length - 1].get(controllerState);
-    }
-
-    @Override
-    public boolean isMutable() {
-        if (!this.usedVariables.isEmpty())
-            return true;
-
-        for (MathValue subValue : this.subValues) {
-            if (subValue.isMutable())
-                return true;
-        }
-
-        return false;
-    }
-
-    @Override
-    public Set<Variable> getUsedVariables() {
-        return this.usedVariables;
+        return this.subValues[this.subValues.length - 1].get();
     }
 
     @Override

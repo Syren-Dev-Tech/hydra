@@ -1,16 +1,17 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.limit;
 
 import net.minecraft.util.Mth;
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the first input value if is larger than the second input value and less than the third input value; or else returns the nearest of the second two input values
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the first input value if is larger than the second input value and less than the third input value; or else returns the nearest of the second two input values
+ */
 public final class ClampFunction extends MathFunction {
     private final MathValue value;
     private final MathValue min;
@@ -30,8 +31,8 @@ public final class ClampFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return Mth.clamp(this.value.get(controllerState), this.min.get(controllerState), this.max.get(controllerState));
+    public double compute() {
+        return Mth.clamp(this.value.get(), this.min.get(), this.max.get());
     }
 
     @Override

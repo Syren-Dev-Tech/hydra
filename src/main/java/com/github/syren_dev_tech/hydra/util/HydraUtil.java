@@ -1,41 +1,51 @@
 package com.github.syren_dev_tech.hydra.util;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import org.jetbrains.annotations.Nullable;
 import com.github.syren_dev_tech.hydra.HydraConstants;
-import com.github.syren_dev_tech.hydra.animatable.GeoAnimatable;
+import com.github.syren_dev_tech.hydra.animatable.HydraAnimatable;
 import com.github.syren_dev_tech.hydra.animatable.instance.AnimatableInstanceCache;
 import com.github.syren_dev_tech.hydra.animatable.instance.InstancedAnimatableInstanceCache;
 import com.github.syren_dev_tech.hydra.animatable.instance.SingletonAnimatableInstanceCache;
-import com.github.syren_dev_tech.hydra.animation.object.EasingType;
-import com.github.syren_dev_tech.hydra.animation.object.LoopType;
-import com.github.syren_dev_tech.hydra.cache.HydraResources;
-import com.github.syren_dev_tech.hydra.loading.loader.HydraLoader;
-import it.unimi.dsi.fastutil.doubles.Double2DoubleFunction;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.component.PatchedDataComponentMap;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import org.jetbrains.annotations.ApiStatus;
+import com.github.syren_dev_tech.hydra.animation.Animation;
+import com.github.syren_dev_tech.hydra.animation.EasingType;
+import com.github.syren_dev_tech.hydra.constant.DataTickets;
+import com.github.syren_dev_tech.hydra.constant.dataticket.DataTicket;
+import com.github.syren_dev_tech.hydra.constant.dataticket.SerializableDataTicket;
+import com.github.syren_dev_tech.hydra.loading.object.BakedModelFactory;
 
-import java.util.Objects;
+import java.util.IdentityHashMap;
+import java.util.Map;
 
-/// Helper class for various Hydra-specific functions.
+/**
+ * Helper class for various Hydra-specific functions.
+ */
 public final class HydraUtil {
-	/// Creates a new AnimatableInstanceCache for the given animatable object
-	///
-	/// @param animatable The animatable object
-	public static AnimatableInstanceCache createInstanceCache(GeoAnimatable animatable) {
+	private static final IdentityHashMap<HydraAnimatable, String> ANIMATABLE_IDENTITIES = new IdentityHashMap<>();
+	public static final Map<String, HydraAnimatable> SYNCED_ANIMATABLES = new Object2ObjectOpenHashMap<>();
+
+	/**
+	 * Creates a new AnimatableInstanceCache for the given animatable object
+	 *
+	 * @param animatable The animatable object
+	 */
+	public static AnimatableInstanceCache createInstanceCache(HydraAnimatable animatable) {
 		AnimatableInstanceCache cache = animatable.animatableCacheOverride();
 
 		return cache != null ? cache : createInstanceCache(animatable, !(animatable instanceof Entity) && !(animatable instanceof BlockEntity));
 	}
 
-	/// Creates a new AnimatableInstanceCache for the given animatable object
-	///
-	/// Recommended to use [HydraUtil#createInstanceCache(GeoAnimatable)] unless you know what you're doing
-	///
-	/// @param animatable The animatable object
-	/// @param singletonObject Whether the object is a singleton/flyweight object, and uses ints to differentiate animatable instances
-	public static AnimatableInstanceCache createInstanceCache(GeoAnimatable animatable, boolean singletonObject) {
+	/**
+	 * Creates a new AnimatableInstanceCache for the given animatable object
+	 * <p>
+	 * Recommended to use {@link HydraUtil#createInstanceCache(HydraAnimatable)} unless you know what you're doing
+	 *
+	 * @param animatable The animatable object
+	 * @param singletonObject Whether the object is a singleton/flyweight object, and uses ints to differentiate animatable instances
+	 */
+	public static AnimatableInstanceCache createInstanceCache(HydraAnimatable animatable, boolean singletonObject) {
 		AnimatableInstanceCache cache = animatable.animatableCacheOverride();
 
 		if (cache != null)
@@ -44,72 +54,108 @@ public final class HydraUtil {
 		return singletonObject ? new SingletonAnimatableInstanceCache(animatable) : new InstancedAnimatableInstanceCache(animatable);
 	}
 
-	/// Register a custom [LoopType] with Hydra, allowing for dynamic handling of post-animation looping
-	///
-	/// **<u>MUST be called during mod construct</u>**
-	///
-	/// @param name The name of the `LoopType` handler
-	/// @param loopType The `LoopType` implementation to use for the given name
-	synchronized public static LoopType addCustomLoopType(String name, LoopType loopType) {
-		return LoopType.register(name, loopType);
+	/**
+	 * Register a custom {@link Animation.LoopType} with Hydra, allowing for dynamic handling of post-animation looping
+	 * <p>
+	 * <b><u>MUST be called during mod construct</u></b>
+	 *
+	 * @param name The name of the {@code LoopType} handler
+	 * @param loopType The {@code LoopType} implementation to use for the given name
+	 */
+	synchronized public static Animation.LoopType addCustomLoopType(String name, Animation.LoopType loopType) {
+		return Animation.LoopType.register(name, loopType);
 	}
 
-	/// Register a custom [EasingType] with Hydra allowing for dynamic handling of animation transitions and curves
-	///
-	/// **<u>MUST be called during mod construct</u>**
-	///
-	/// @param name The name of the `EasingType` handler
-	/// @param easingType The `EasingType` implementation to use for the given name
+	/**
+	 * Register a custom {@link EasingType} with Hydra allowing for dynamic handling of animation transitions and curves
+	 * <p>
+	 * <b><u>MUST be called during mod construct</u></b>
+	 *
+	 * @param name The name of the {@code EasingType} handler
+	 * @param easingType The {@code EasingType} implementation to use for the given name
+	 */
 	synchronized public static EasingType addCustomEasingType(String name, EasingType easingType) {
 		return EasingType.register(name, easingType);
 	}
 
-	/// Register a zero-parameter [EasingType] with Hydra for handling animation transitions and value curves
-	///
-	/// **<u>MUST be called during mod construct</u>**
-	///
-	/// @param name The name of the `EasingType` handler
-	/// @param function The interpolation function for this easing type
-	synchronized public static EasingType addCustomSimpleEasingType(String name, Double2DoubleFunction function) {
-		return EasingType.registerSimple(name, function);
+	/**
+	 * Register a custom {@link BakedModelFactory} with Hydra, allowing for dynamic handling of hydra model loading
+	 * <p>
+	 * <b><u>MUST be called during mod construct</u></b>
+	 *
+	 * @param namespace The namespace (modid) to register the factory for
+	 * @param factory The factory responsible for model loading under the given namespace
+	 */
+	synchronized public static void addCustomBakedModelFactory(String namespace, BakedModelFactory factory) {
+		BakedModelFactory.register(namespace, factory);
 	}
 
-	/// Register a custom [HydraLoader] with Hydra for handling custom resource loading
-	///
-	/// **<u>MUST be called during mod construct</u>**
-	///
-	/// @param predicate A predicate that determines whether the given resource should be handled by the associated loader
-	synchronized public static void addResourceLoader(HydraLoader.Predicate predicate, HydraLoader<?> loader) {
-		HydraResources.addLoader(predicate, loader);
+	/**
+	 * Register a custom {@link SerializableDataTicket} with Hydra for handling custom data transmission
+	 * <p>
+	 * NOTE: You do not need to register non-serializable {@link DataTicket DataTickets}.
+	 * <p>
+	 * <b><u>MUST be called during mod construct</u></b>
+	 *
+	 * @param dataTicket The SerializableDataTicket to register
+	 * @return The dataTicket you passed in
+	 */
+	synchronized public static <D> SerializableDataTicket<D> addDataTicket(SerializableDataTicket<D> dataTicket) {
+		return DataTickets.registerSerializable(dataTicket);
 	}
 
-	/// Perform an [Object#equals(Object)] check on two [PatchedDataComponentMap]s,
-	/// ignoring any Hydra stack ids that may be present.
-	///
-	/// This is typically only called by an internal mixin
-	@ApiStatus.Internal
-	public static boolean areComponentsMatchingIgnoringHydraId(PatchedDataComponentMap map1, PatchedDataComponentMap map2) {
-		final DataComponentType<Long> stackId = HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get();
-		boolean patched = false;
+	/**
+	 * Registers a synced {@link HydraAnimatable} object for networking support
+	 * <p>
+	 * It is recommended that you don't call this directly, instead implementing and calling {@link com.github.syren_dev_tech.hydra.animatable.SingletonHydraAnimatable#registerSyncedAnimatable}
+	 */
+	synchronized public static void registerSyncedAnimatable(HydraAnimatable animatable) {
+		synchronized (SYNCED_ANIMATABLES) {
+			HydraAnimatable existing = SYNCED_ANIMATABLES.put(getSyncedSingletonAnimatableId(animatable), animatable);
 
-		if (map1.has(stackId)) {
-			PatchedDataComponentMap prevMap = map1;
-			boolean copyOnWrite = prevMap.copyOnWrite;
-			(map1 = map1.copy()).remove(stackId);
-			map1.copyOnWrite = copyOnWrite;
-			patched = true;
+			if (existing == null)
+				HydraConstants.LOGGER.debug("Registered SyncedAnimatable for {}", animatable.getClass());
 		}
-
-		if (map2.has(stackId)) {
-			PatchedDataComponentMap prevMap = map2;
-			boolean copyOnWrite = prevMap.copyOnWrite;
-			(map2 = map2.copy()).remove(stackId);
-			map2.copyOnWrite = copyOnWrite;
-			patched = true;
-		}
-
-		return patched && Objects.equals(map1, map2);
 	}
 
-    private HydraUtil() {}
+	/**
+	 * Gets a registered synced {@link HydraAnimatable} object by name
+	 * <p>
+	 * The input string <b>MUST</b> be the {@link Class#getName()} of the animatable, passed through
+	 * {@link #getSyncedSingletonAnimatableId(HydraAnimatable)}
+	 *
+	 * @param syncedAnimatableId the animatable id
+	 */
+	@Nullable
+	public static HydraAnimatable getSyncedAnimatable(String syncedAnimatableId) {
+		synchronized (SYNCED_ANIMATABLES) {
+			HydraAnimatable animatable = SYNCED_ANIMATABLES.get(syncedAnimatableId);
+
+			if (animatable == null)
+				HydraConstants.LOGGER.error("Attempting to retrieve unregistered synced animatable! ({})", syncedAnimatableId);
+
+			return animatable;
+		}
+	}
+
+	/**
+	 * Get a synced singleton animatable's id for use with {@link #SYNCED_ANIMATABLES}
+	 * <p>
+	 * This <b><u>MUST</u></b> be used when retrieving from {@link #SYNCED_ANIMATABLES}
+	 * as this method eliminates class duplication collisions
+	 */
+	public static String getSyncedSingletonAnimatableId(HydraAnimatable animatable) {
+		synchronized (SYNCED_ANIMATABLES) {
+			return ANIMATABLE_IDENTITIES.computeIfAbsent(animatable, key -> {
+				String baseId = animatable.getClass().getName();
+				int i = 0;
+
+				while (SYNCED_ANIMATABLES.containsKey(baseId + i)) {
+					i++;
+				}
+
+				return baseId + i;
+			});
+		}
+	}
 }

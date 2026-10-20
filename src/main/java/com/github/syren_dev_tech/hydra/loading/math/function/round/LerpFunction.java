@@ -1,16 +1,17 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.round;
 
 import net.minecraft.util.Mth;
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the first value plus the difference between the first and second input values multiplied by the third input value
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the first value plus the difference between the first and second input values multiplied by the third input value
+ */
 public final class LerpFunction extends MathFunction {
     private final MathValue min;
     private final MathValue max;
@@ -30,8 +31,8 @@ public final class LerpFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return Mth.lerp(this.delta.get(controllerState), this.min.get(controllerState), this.max.get(controllerState));
+    public double compute() {
+        return Mth.lerp(this.delta.get(), this.min.get(), this.max.get());
     }
 
     @Override

@@ -1,30 +1,24 @@
 package com.github.syren_dev_tech.hydra.loading.math.value;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 
-import java.util.Set;
-
-/// [MathValue] value supplier
-///
-/// **Contract:**
-///
-/// Negated equivalent of the stored value; returning a positive number if the stored value is negative, or a negative value if the stored value is positive
+/**
+ * {@link MathValue} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Negated equivalent of the stored value; returning a positive number if the stored value is negative, or a negative value if the stored value is positive
+ */
 public record Negative(MathValue value) implements MathValue {
     @Override
-    public double get(@Nullable ControllerState controllerState) {
-        return -this.value.get(controllerState);
+    public double get() {
+        return -this.value.get();
     }
 
     @Override
     public boolean isMutable() {
         return this.value.isMutable();
-    }
-
-    @Override
-    public Set<Variable> getUsedVariables() {
-        return this.value.getUsedVariables();
     }
 
     @Override

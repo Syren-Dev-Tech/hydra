@@ -1,29 +1,33 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.random;
 
 import net.minecraft.util.Mth;
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
+import org.jetbrains.annotations.Nullable;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns a random integer value based on the input values:
-///
-///   - Three inputs: Generates the sum of _n_ (first input) random values between the second (inclusive) and third input (inclusive)
-///   - Four inputs: Generates the sum of _n_ (first input) random values between the second (inclusive) and third input (inclusive), seeded by the fourth input
-///
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns a random integer value based on the input values:
+ * <ul>
+ *     <li>Three inputs generates the sum of <i>n</i> (first input) random values between the second (inclusive) and third input (inclusive)</li>
+ *     <li>Four inputs generates the sum of <i>n</i> (first input) random values between the second (inclusive) and third input (inclusive), seeded by the fourth input</li>
+ * </ul>
+ */
 public final class DieRollIntegerFunction extends MathFunction {
     private final MathValue rolls;
     private final MathValue min;
     private final MathValue max;
-    private final @Nullable MathValue seed;
-    private final @Nullable Random random;
+    @Nullable
+    private final MathValue seed;
+    @Nullable
+    private final Random random;
 
     public DieRollIntegerFunction(MathValue... values) {
         super(values);
@@ -41,18 +45,18 @@ public final class DieRollIntegerFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        final int rolls = (int)(Math.floor(this.rolls.get(controllerState)));
-        final int minValue = Mth.floor(this.min.get(controllerState));
-        final int maxValue = Mth.ceil(this.max.get(controllerState));
+    public double compute() {
+        final int rolls = (int)(Math.floor(this.rolls.get()));
+        final int minValue = Mth.floor(this.min.get());
+        final int maxValue = Mth.ceil(this.max.get());
         final int min = Math.min(minValue, maxValue);
         final int max = Math.max(minValue, maxValue);
         int sum = 0;
         Random random;
 
-        if (this.random != null && this.seed != null) {
+        if (this.random != null) {
             random = this.random;
-            random.setSeed((long)this.seed.get(controllerState));
+            random.setSeed((long)this.seed.get());
         }
         else {
             random = ThreadLocalRandom.current();

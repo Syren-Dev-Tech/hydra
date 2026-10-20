@@ -1,27 +1,32 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.random;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
+import org.jetbrains.annotations.Nullable;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
 import java.util.Random;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns a random value based on the input values:
-///
-///   - A single input generates a value between 0 and that input (exclusive)
-///   - Two inputs generates a random value between the first (inclusive) and second input (exclusive)
-///   - Three inputs generates a random value between the first (inclusive) and second input (exclusive), seeded by the third input
-///
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns a random value based on the input values:
+ * <ul>
+ *     <li>A single input generates a value between 0 and that input (exclusive)</li>
+ *     <li>Two inputs generates a random value between the first (inclusive) and second input (exclusive)</li>
+ *     <li>Three inputs generates a random value between the first (inclusive) and second input (exclusive), seeded by the third input</li>
+ * </ul>
+ */
 public final class RandomFunction extends MathFunction {
     private final MathValue valueA;
-    private final @Nullable MathValue valueB;
-    private final @Nullable MathValue seed;
-    private final @Nullable Random random;
+    @Nullable
+    private final MathValue valueB;
+    @Nullable
+    private final MathValue seed;
+    @Nullable
+    private final Random random;
 
     public RandomFunction(MathValue... values) {
         super(values);
@@ -38,12 +43,12 @@ public final class RandomFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
+    public double compute() {
         double result;
-        double valueA = this.valueA.get(controllerState);
+        double valueA = this.valueA.get();
 
-        if (this.random != null && this.seed != null) {
-            this.random.setSeed((long)this.seed.get(controllerState));
+        if (this.random != null) {
+            this.random.setSeed((long)this.seed.get());
 
             result = this.random.nextDouble();
         }
@@ -52,7 +57,7 @@ public final class RandomFunction extends MathFunction {
         }
 
         if (this.valueB != null) {
-            double valueB = this.valueB.get(controllerState);
+            double valueB = this.valueB.get();
             double min = Math.min(valueA, valueB);
             double max = Math.max(valueA, valueB);
 

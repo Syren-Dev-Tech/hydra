@@ -1,25 +1,20 @@
 package com.github.syren_dev_tech.hydra.loading.math.value;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 
-import java.util.Set;
-
-/// [MathValue] value supplier
-///
-/// **Contract:**
-///
-/// Returns one of two stored values dependent on the result of the stored condition value.
-/// This returns such that a non-zero result from the condition will return the **true** stored value, otherwise returning the **false** stored value
-public record Ternary(MathValue condition, MathValue trueValue, MathValue falseValue, Set<Variable> usedVariables) implements MathValue {
-    public Ternary(MathValue condition, MathValue trueValue, MathValue falseValue) {
-        this(condition, trueValue, falseValue, MathValue.collectUsedVariables(condition, trueValue, falseValue));
-    }
-
+/**
+ * {@link MathValue} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns one of two stored values dependent on the result of the stored condition value.
+ * This returns such that a non-zero result from the condition will return the <b>true</b> stored value, otherwise returning the <b>false</b> stored value
+ */
+public record Ternary(MathValue condition, MathValue trueValue, MathValue falseValue) implements MathValue {
     @Override
-    public double get(@Nullable ControllerState controllerState) {
-        return this.condition.get(controllerState) != 0 ? this.trueValue.get(controllerState) : this.falseValue.get(controllerState);
+    public double get() {
+        return this.condition.get() != 0 ? this.trueValue.get() : this.falseValue.get();
     }
 
     @Override
@@ -28,12 +23,7 @@ public record Ternary(MathValue condition, MathValue trueValue, MathValue falseV
     }
 
     @Override
-    public Set<Variable> getUsedVariables() {
-        return this.usedVariables;
-    }
-
-    @Override
     public String toString() {
-        return this.condition + " ? " + this.trueValue + " : " + this.falseValue;
+        return this.condition.toString() + " ? " + this.trueValue.toString() + " : " + this.falseValue.toString();
     }
 }

@@ -7,12 +7,16 @@ import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import com.github.syren_dev_tech.hydra.HydraConstants;
-import com.github.syren_dev_tech.hydra.util.HydraUtil;
+import com.github.syren_dev_tech.hydra.util.InternalUtil;
 
-/// Injection into ItemStack functionality to handle duplication and splitting with Hydra stack identifiers
+/**
+ * Injection into ItemStack functionality to handle duplication and splitting with Hydra stack identifiers
+ */
 @Mixin(ItemStack.class)
 public class ItemStackMixin {
-    /// Remove the Hydra stack ID when splitting up a stack into two
+    /**
+     * Remove the Hydra stack ID when splitting up a stack into two
+     */
     @WrapOperation(method = "split", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/ItemStack;copyWithCount(I)Lnet/minecraft/world/item/ItemStack;"))
     public ItemStack hydra$removeHydraIdOnCopy(ItemStack instance, int count, Operation<ItemStack> original) {
         ItemStack copy = original.call(instance, count);
@@ -23,9 +27,11 @@ public class ItemStackMixin {
         return copy;
     }
 
-    /// Consider ItemStacks equal if the only difference is their Hydra stack ID
-    ///
-    /// We do this so that the game doesn't prevent combining stacks due solely to Hydra sync IDs.
+    /**
+     * Consider ItemStacks equal if the only difference is their Hydra stack ID
+     * <p>
+     * We do this so that the game doesn't prevent combining stacks due solely to Hydra sync IDs.
+     */
     @WrapOperation(method = "isSameItemSameComponents", at = @At(value = "INVOKE", target = "Ljava/util/Objects;equals(Ljava/lang/Object;Ljava/lang/Object;)Z"))
     private static boolean hydra$skipHydraIdOnCompare(Object a, Object b, Operation<Boolean> original) {
         if (original.call(a, b))
@@ -34,6 +40,6 @@ public class ItemStackMixin {
         if (!(a instanceof PatchedDataComponentMap components) || !(b instanceof PatchedDataComponentMap components2))
             return false;
 
-        return HydraUtil.areComponentsMatchingIgnoringHydraId(components, components2);
+        return InternalUtil.areComponentsMatchingIgnoringHydraId(components, components2);
     }
 }

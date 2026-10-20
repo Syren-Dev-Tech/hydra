@@ -1,65 +1,50 @@
 package com.github.syren_dev_tech.hydra.loading.math.value;
 
-import org.jspecify.annotations.Nullable;
 import com.github.syren_dev_tech.hydra.HydraConstants;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.ToDoubleFunction;
+import java.util.function.DoubleSupplier;
 
-/// [MathValue] value supplier
-///
-/// **Contract:**
-///
-/// Returns the currently stored value, which may be modified at any given time via [#set]. Values may be lazily evaluated to eliminate wasteful usage
-public record Variable(String name, AtomicReference<ToDoubleFunction<ControllerState>> value) implements MathValue {
+/**
+ * {@link MathValue} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the currently stored value, which may be modified at any given time via {@link #set}. Values may be lazily evaluated to eliminate wasteful usage
+ */
+public record Variable(String name, AtomicReference<DoubleSupplier> value) implements MathValue {
     public Variable(String name, double value) {
-        this(name, _ -> value);
+        this(name, () -> value);
     }
 
-    public Variable(String name, ToDoubleFunction<ControllerState> value) {
+    public Variable(String name, DoubleSupplier value) {
         this(name, new AtomicReference<>(value));
     }
 
     @Override
-    public double get(@Nullable ControllerState controllerState) {
-        if (controllerState == null)
-            return 0;
-
+    public double get() {
         try {
-            return this.value.get().applyAsDouble(controllerState);
+            return this.value.get().getAsDouble();
         }
         catch (Exception ex) {
-            HydraConstants.LOGGER.error("Attempted to use Molang variable for incompatible animatable type ({}). An animation json needs to be fixed", this.name);
-            //noinspection CallToPrintStackTrace
-            ex.printStackTrace();
+            HydraConstants.LOGGER.error("Attempted to use Molang variable for incompatible animatable type (" + this.name + "). An animation json needs to be fixed", ex.getMessage());
 
             return 0;
         }
     }
 
     public void set(final double value) {
-        this.value.set(_ -> value);
+        this.value.set(() -> value);
     }
 
-    public void set(final ToDoubleFunction<ControllerState> value) {
+    public void set(final DoubleSupplier value) {
         this.value.set(value);
     }
 
     @Override
-    public Set<Variable> getUsedVariables() {
-        return Set.of(this);
-    }
-
-    @Override
     public String toString() {
-        return "variable(" + this.name + ")";
-    }
-
-    @Override
-    public int hashCode() {
-        return this.name.hashCode();
+        return this.name + "(" + this.value.get().getAsDouble() + ")";
     }
 }

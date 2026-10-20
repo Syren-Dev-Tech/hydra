@@ -1,195 +1,237 @@
 package com.github.syren_dev_tech.hydra.util;
 
-import com.github.syren_dev_tech.hydra.animatable.GeoAnimatable;
-import com.github.syren_dev_tech.hydra.animatable.client.GeoRenderProvider;
-import com.github.syren_dev_tech.hydra.cache.model.GeoBone;
-import com.github.syren_dev_tech.hydra.cache.model.GeoLocator;
-import com.github.syren_dev_tech.hydra.cache.model.GeoQuad;
-import com.github.syren_dev_tech.hydra.cache.model.cuboid.GeoCube;
-import com.github.syren_dev_tech.hydra.constant.DataTickets;
-import com.github.syren_dev_tech.hydra.renderer.*;
-import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderState;
-import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderer;
-import com.github.syren_dev_tech.hydra.renderer.base.RenderPassInfo;
+import com.mojang.blaze3d.Blaze3D;
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
-import com.mojang.renderpearl.api.textures.GpuTexture;
+import it.unimi.dsi.fastutil.ints.IntIntImmutablePair;
 import it.unimi.dsi.fastutil.ints.IntIntPair;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.block.BlockModelRenderState;
-import net.minecraft.client.renderer.block.BlockModelResolver;
-import net.minecraft.client.renderer.block.model.BlockDisplayContext;
-import net.minecraft.client.renderer.item.ItemModelResolver;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.equipment.Equippable;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.Vec3;
-import org.joml.*;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+import com.github.syren_dev_tech.hydra.HydraConstants;
+import com.github.syren_dev_tech.hydra.HydraServices;
+import com.github.syren_dev_tech.hydra.cache.object.HydraBone;
+import com.github.syren_dev_tech.hydra.cache.object.HydraCube;
+import com.github.syren_dev_tech.hydra.animatable.HydraAnimatable;
+import com.github.syren_dev_tech.hydra.model.HydraModel;
+import com.github.syren_dev_tech.hydra.renderer.HydraRenderer;
+import com.github.syren_dev_tech.hydra.renderer.HydraReplacedEntityRenderer;
 
-import java.util.List;
-
-/// Helper class for various methods and functions useful while rendering
+/**
+ * Helper class for various methods and functions useful while rendering
+ */
 public final class RenderUtil {
-    /// Transform a PoseStack to match a bone's render position.
-    ///
-    /// Can only be used inside a [RenderPassInfo#renderPosed] call
-    public static void transformToBone(PoseStack poseStack, GeoBone bone) {
-        final List<GeoBone> boneQueue = new ObjectArrayList<>();
-        GeoBone parent = bone;
-
-        boneQueue.add(bone);
-
-        while ((parent = parent.parent()) != null) {
-            boneQueue.add(parent);
-        }
-
-        for (GeoBone bone2 : boneQueue.reversed()) {
-            prepMatrixForBone(poseStack, bone2);
-        }
-
-        bone.translateToPivotPoint(poseStack);
+    public static void translateMatrixToBone(PoseStack poseStack, HydraBone bone) {
+        poseStack.translate(-bone.getPosX() / 16f, bone.getPosY() / 16f, bone.getPosZ() / 16f);
     }
 
-	public static void translateAndRotateMatrixForBone(PoseStack poseStack, GeoBone bone) {
-        bone.translateToPivotPoint(poseStack);
+    public static void rotateMatrixAroundBone(PoseStack poseStack, HydraBone bone) {
+        RenderUtil.optionalRotateZYX(poseStack, bone.getRotZ(), bone.getRotY(), bone.getRotX());
+    }
 
-        float xRot = bone.baseRotX();
-        float yRot = bone.baseRotY();
-        float zRot = bone.baseRotZ();
+    public static void rotateMatrixAroundCube(PoseStack poseStack, HydraCube cube) {
+        Vec3 rotation = cube.rotation();
 
-        if (bone.frameSnapshot != null) {
-            xRot += bone.frameSnapshot.getRotX();
-            yRot += bone.frameSnapshot.getRotY();
-            zRot += bone.frameSnapshot.getRotZ();
+        poseStack.mulPose(new Quaternionf().rotationXYZ(0, 0, (float) rotation.z()));
+        poseStack.mulPose(new Quaternionf().rotationXYZ(0, (float) rotation.y(), 0));
+        poseStack.mulPose(new Quaternionf().rotationXYZ((float) rotation.x(), 0, 0));
+    }
+
+    public static void scaleMatrixForBone(PoseStack poseStack, HydraBone bone) {
+        poseStack.scale(bone.getScaleX(), bone.getScaleY(), bone.getScaleZ());
+    }
+
+    public static void translateToPivotPoint(PoseStack poseStack, HydraCube cube) {
+        Vec3 pivot = cube.pivot();
+        poseStack.translate(pivot.x() / 16f, pivot.y() / 16f, pivot.z() / 16f);
+    }
+
+    public static void translateToPivotPoint(PoseStack poseStack, HydraBone bone) {
+        poseStack.translate(bone.getPivotX() / 16f, bone.getPivotY() / 16f, bone.getPivotZ() / 16f);
+    }
+
+    public static void translateAwayFromPivotPoint(PoseStack poseStack, HydraCube cube) {
+        Vec3 pivot = cube.pivot();
+
+        poseStack.translate(-pivot.x() / 16f, -pivot.y() / 16f, -pivot.z() / 16f);
+    }
+
+    public static void translateAwayFromPivotPoint(PoseStack poseStack, HydraBone bone) {
+        poseStack.translate(-bone.getPivotX() / 16f, -bone.getPivotY() / 16f, -bone.getPivotZ() / 16f);
+    }
+
+    public static void translateAndRotateMatrixForBone(PoseStack poseStack, HydraBone bone) {
+        translateToPivotPoint(poseStack, bone);
+        rotateMatrixAroundBone(poseStack, bone);
+    }
+
+    public static void prepMatrixForBone(PoseStack poseStack, HydraBone bone) {
+        translateMatrixToBone(poseStack, bone);
+        translateToPivotPoint(poseStack, bone);
+        rotateMatrixAroundBone(poseStack, bone);
+        scaleMatrixForBone(poseStack, bone);
+        translateAwayFromPivotPoint(poseStack, bone);
+    }
+
+    public static Matrix4f invertAndMultiplyMatrices(Matrix4f baseMatrix, Matrix4f inputMatrix) {
+        inputMatrix = new Matrix4f(inputMatrix);
+
+        inputMatrix.invert();
+        inputMatrix.mul(baseMatrix);
+
+        return inputMatrix;
+    }
+
+    /**
+     * Translates the provided {@link PoseStack} to face towards the given {@link Entity}'s rotation
+     * <p>
+     * Usually used for rotating projectiles towards their trajectory, in an {@link HydraRenderer#preRender} override
+     */
+    public static void faceRotation(PoseStack poseStack, Entity animatable, float partialTick) {
+        poseStack.mulPose(Axis.YP.rotationDegrees(Mth.lerp(partialTick, animatable.yRotO, animatable.getYRot()) - 90));
+        poseStack.mulPose(Axis.ZP.rotationDegrees(Mth.lerp(partialTick, animatable.xRotO, animatable.getXRot())));
+    }
+
+    /**
+     * Add a positional vector to a matrix
+     * <p>
+     * This is specifically implemented to act as a translation of an x/y/z coordinate triplet to a render matrix
+     */
+    public static Matrix4f translateMatrix(Matrix4f matrix, Vector3f vector) {
+        return matrix.add(new Matrix4f().m30(vector.x).m31(vector.y).m32(vector.z));
+    }
+
+    /**
+     * Gets the actual dimensions of a texture resource from a given path
+     * <p>
+     * Not performance-efficient, and should not be relied upon
+     *
+     * @param texture The path of the texture resource to check
+     * @return The dimensions (width x height) of the texture, or null if unable to find or read the file
+     */
+    @Nullable
+    public static IntIntPair getTextureDimensions(ResourceLocation texture) {
+        if (texture == null)
+            return null;
+
+        AbstractTexture originalTexture = null;
+        Minecraft mc = Minecraft.getInstance();
+
+        try {
+            originalTexture = mc.submit(() -> mc.getTextureManager().getTexture(texture)).get();
+        } catch (Exception e) {
+            HydraConstants.LOGGER.warn("Failed to load image for id {}", texture);
+            e.printStackTrace();
         }
 
-        RenderUtil.optionalRotateZYX(poseStack, zRot, yRot, xRot);
-	}
+        if (originalTexture == null)
+            return null;
 
-    /// Make the necessarily manipulations of the [PoseStack] to position a bone based on its current snapshot and state
-    public static void prepMatrixForBone(PoseStack poseStack, GeoBone bone) {
-        prepMatrixForBoneAndUpdateListeners(poseStack, bone, null);
-	}
+        NativeImage image = null;
 
-    /// Make the necessarily manipulations of the [PoseStack] to position a bone based on its current snapshot and state
-    ///
-    /// Additionally update the RenderPassInfo's [RenderPassInfo.BonePositionListener]s, if applicable
-    public static void prepMatrixForBoneAndUpdateListeners(PoseStack poseStack, GeoBone bone, @Nullable RenderPassInfo<?> renderPassInfo) {
-        if (bone.frameSnapshot != null)
-            bone.frameSnapshot.translate(poseStack);
-
-        translateAndRotateMatrixForBone(poseStack, bone);
-
-        if (bone.frameSnapshot != null)
-            bone.frameSnapshot.scale(poseStack);
-
-        if (renderPassInfo != null)
-            bone.updateBonePositionListeners(poseStack, renderPassInfo);
-
-        bone.translateAwayFromPivotPoint(poseStack);
-	}
-
-    /// Convert a [Matrix4fc] pose to a three-dimensional vector position, multiplying it by input values
-    /// to allow for inline transformations
-    public static Vec3 renderPoseToPosition(Matrix4fc pose, float xScale, float yScale, float zScale) {
-        final Vector4f position = pose.transform(new Vector4f(0, 0, 0, 1));
-
-        return new Vec3(position.x() * xScale, position.y() * yScale, position.z() * zScale);
-    }
-
-    /// Extract the relative pose of an input matrix from a base matrix
-    public static Matrix4f extractPoseFromRoot(Matrix4fc baseMatrix, Matrix4f inputMatrix) {
-		inputMatrix = new Matrix4f(inputMatrix);
-		
-		inputMatrix.invert();
-		inputMatrix.mul(baseMatrix);
-
-		return inputMatrix;
-	}
-
-    /// Directly translate a Matrix pose by a given position
-    public static Matrix4f addPosToMatrix(Matrix4f baseMatrix, Vec3 pos) {
-        baseMatrix.m30(baseMatrix.m30() + (float)pos.x)
-                .m31(baseMatrix.m31() + (float)pos.y)
-                .m32(baseMatrix.m32() + (float)pos.z);
-
-        return baseMatrix;
-    }
-
-    /// Extract the local, model, and world positions from the given [RenderPassInfo] and [PoseStack] to provide to
-    /// any listening [RenderPassInfo.BonePositionListener]s
-    ///
-    /// Used for both [GeoBone]s and [GeoLocator]s
-    public static void providePositionsToListeners(PoseStack poseStack, RenderPassInfo<?> renderPassInfo, RenderPassInfo.BonePositionListener[] listeners) {
-        final Matrix4f bonePose = new Matrix4f(poseStack.last().pose());
-        final Matrix4f localPose = RenderUtil.extractPoseFromRoot(bonePose, renderPassInfo.getPreRenderMatrixState());
-        final Matrix4f modelPose = RenderUtil.extractPoseFromRoot(bonePose, renderPassInfo.getModelRenderMatrixState());
-        final Vec3 position = renderPassInfo.renderState().getHydraData(DataTickets.POSITION);
-        final Matrix4f worldPose = position == null ? null : RenderUtil.addPosToMatrix(new Matrix4f(localPose), position);
-        final Vec3 localPos = RenderUtil.renderPoseToPosition(localPose, 1, 1, 1);
-        final Vec3 modelPos = RenderUtil.renderPoseToPosition(modelPose, -16, 16, 16);
-        final Vec3 worldPos = worldPose == null ? null : RenderUtil.renderPoseToPosition(worldPose, 1, 1, 1);
-
-        for (RenderPassInfo.BonePositionListener positionListener : listeners) {
-            positionListener.accept(worldPos, modelPos, localPos);
+        try {
+            image = originalTexture instanceof DynamicTexture dynamicTexture ? dynamicTexture.getPixels() : NativeImage.read(mc.getResourceManager().getResource(texture).get().open());
+        } catch (Exception e) {
+            HydraConstants.LOGGER.error("Failed to read image for id {}", texture);
+            e.printStackTrace();
         }
+
+        return image == null ? null : IntIntImmutablePair.of(image.getWidth(), image.getHeight());
     }
-	
-	/// Translates the provided [PoseStack] to face towards the given [Entity]'s rotation
-	///
-	/// Usually used for rotating projectiles towards their trajectory, in an [GeoRenderer#preRenderPass] override
-	public static void faceRotation(PoseStack poseStack, Entity animatable, float partialTick) {
-		poseStack.rotateDegrees(Axis.YP, Mth.lerp(partialTick, animatable.yRotO, animatable.getYRot()) - 90);
-		poseStack.rotateDegrees(Axis.ZP, Mth.lerp(partialTick, animatable.xRotO, animatable.getXRot()));
-	}
 
-	/// Add a positional vector to a matrix
-	///
-	/// This is specifically implemented to act as a translation of an x/y/z coordinate triplet to a render matrix
-	public static Matrix4f translateMatrix(Matrix4f matrix, Vector3f vector) {
-		return matrix.add(new Matrix4f().m30(vector.x).m31(vector.y).m32(vector.z));
-	}
-	
-	/// Gets the actual dimensions of a texture resource from a given path
-	///
-	/// @param texture The path of the texture resource to check
-	/// @return The dimensions (width x height) of the texture
-	public static IntIntPair getTextureDimensions(Identifier texture) {
-		GpuTexture gpuTexture = Minecraft.getInstance().getTextureManager().getTexture(texture).getTexture();
+    public static double getCurrentSystemTick() {
+        return System.nanoTime() / 1E6 / 50d;
+    }
 
-		return IntIntPair.of(gpuTexture.getWidth(0), gpuTexture.getHeight(0));
-	}
+    /**
+     * Returns the current time (in ticks) that the {@link org.lwjgl.glfw.GLFW GLFW} instance has been running
+     * <p>
+     * This is effectively a permanent timer that counts up since the game was launched.
+     */
+    public static double getCurrentTick() {
+        return Blaze3D.getTime() * 20d;
+    }
 
-	/// If a [GeoCube] is a 2d plane and the [Quad's][GeoQuad] normal is inverted on an intersecting plane,
-	/// it can cause issues with shaders and other lighting tasks
-	///
-	/// This performs a pseudo-ABS function to help resolve some of those issues
-	public static void fixInvertedFlatCube(GeoCube cube, Vector3f normal) {
-		if (normal.x() < 0 && (cube.size().y() == 0 || cube.size().z() == 0))
-			normal.mul(-1, 1, 1);
+    /**
+     * Returns a float equivalent of a boolean
+     * <p>
+     * Output table:
+     * <ul>
+     * <li>true -> 1</li>
+     * <li>false -> 0</li>
+     * </ul>
+     */
+    public static float booleanToFloat(boolean input) {
+        return input ? 1f : 0f;
+    }
 
-		if (normal.y() < 0 && (cube.size().x() == 0 || cube.size().z() == 0))
-			normal.mul(1, -1, 1);
+    /**
+     * Converts a given double array to its {@link Vec3} equivalent
+     */
+    public static Vec3 arrayToVec(double[] array) {
+        final double x;
+        final double y;
+        final double z;
 
-		if (normal.z() < 0 && (cube.size().x() == 0 || cube.size().y() == 0))
-			normal.mul(1, 1, -1);
-	}
+        if (array.length == 1) {
+            x = y = z = array[0];
+        } else {
+            x = array[0];
+            y = array[1];
+            z = array[2];
+        }
 
-    /// Rotate a [PoseStack] around a given z/y/x axis, reducing the amount of work performed to the minimal required
-    /// for the given values
+        if (x == 0 && y == 0 && z == 0)
+            return Vec3.ZERO;
+
+        return new Vec3(x, y, z);
+    }
+
+    /**
+     * Rotates a {@link HydraBone} to match a provided {@link ModelPart}'s rotations
+     * <p>
+     * Usually used for items or armor rendering to match the rotations of other non-hydra model parts
+     */
+    public static void matchModelPartRot(ModelPart from, HydraBone to) {
+        to.updateRotation(-from.xRot, -from.yRot, from.zRot);
+    }
+
+    /**
+     * If a {@link HydraCube} is a 2d plane the {@link com.github.syren_dev_tech.hydra.cache.object.HydraQuad Quad's} normal is inverted in an intersecting plane,it can cause issues with shaders and other lighting tasks
+     * <p>
+     * This performs a pseudo-ABS function to help resolve some of those issues
+     */
+    public static void fixInvertedFlatCube(HydraCube cube, Vector3f normal) {
+        if (normal.x() < 0 && (cube.size().y() == 0 || cube.size().z() == 0))
+            normal.mul(-1, 1, 1);
+
+        if (normal.y() < 0 && (cube.size().x() == 0 || cube.size().z() == 0))
+            normal.mul(1, -1, 1);
+
+        if (normal.z() < 0 && (cube.size().x() == 0 || cube.size().y() == 0))
+            normal.mul(1, 1, -1);
+    }
+
+    /**
+     * Rotate a [PoseStack] around a given z/y/x axis, reducing the amount of work performed to the minimal required for the given values
+     */
     public static void optionalRotateZYX(PoseStack poseStack, double z, double y, double x) {
         if (z == 0 && y == 0 && x == 0)
             return;
@@ -197,136 +239,135 @@ public final class RenderUtil {
         final Quaternionf quat = new Quaternionf();
 
         if (x == 0 && y == 0) {
-            quat.rotationZ((float)z);
-        }
-        else if (x == 0 && z == 0) {
-            quat.rotationY((float)y);
-        }
-        else if (y == 0 && z == 0) {
-            quat.rotationX((float)x);
-        }
-        else {
-            quat.rotationZYX((float)z, (float)y, (float)x);
+            quat.rotationZ((float) z);
+        } else if (x == 0 && z == 0) {
+            quat.rotationY((float) y);
+        } else if (y == 0 && z == 0) {
+            quat.rotationX((float) x);
+        } else {
+            quat.rotationZYX((float) z, (float) y, (float) x);
         }
 
-        poseStack.rotate(quat);
+        poseStack.mulPose(quat);
     }
 
-    /// Create and populate an [ItemStackRenderState] for a given [ItemStack] for rendering
-    ///
-    /// Should typically be called during [GeoRenderState] extraction prior to render submission
-    public static ItemStackRenderState createRenderStateForItem(ItemStack itemStack, ItemModelResolver itemModelResolver, ItemDisplayContext displayContext) {
-        return createRenderStateForItem(itemStack, itemModelResolver, displayContext, null);
+    /**
+     * Converts a {@link Direction} to a rotational float for rotation purposes
+     */
+    public static float getDirectionAngle(Direction direction) {
+        return switch (direction) {
+            case SOUTH -> 90f;
+            case NORTH -> 270f;
+            case EAST -> 180f;
+            default -> 0f;
+        };
     }
 
-    /// Create and populate an [ItemStackRenderState] for a given [ItemStack] and [Entity] context for rendering
-    ///
-    /// Should typically be called during [GeoRenderState] extraction prior to render submission
-    public static ItemStackRenderState createRenderStateForItem(ItemStack stack, ItemModelResolver itemModelResolver, ItemDisplayContext displayContext, @Nullable Entity owner) {
-        final ItemStackRenderState renderState = new ItemStackRenderState();
+    /**
+     * Special helper function for lerping yaw.
+     * <p>
+     * This exists because yaw in Minecraft handles its yaw a bit strangely, and can cause incorrect results if lerped without accounting for special-cases
+     */
+    public static double lerpYaw(double delta, double start, double end) {
+        start = Mth.wrapDegrees(start);
+        end = Mth.wrapDegrees(end);
+        double diff = start - end;
+        end = diff > 180 || diff < -180 ? start + Math.copySign(360 - Math.abs(diff), diff) : end;
 
-        if (owner instanceof LivingEntity livingEntity) {
-            itemModelResolver.updateForLiving(renderState, stack, displayContext, livingEntity);
-        }
-        else if (owner != null) {
-            itemModelResolver.updateForNonLiving(renderState, stack, displayContext, owner);
-        }
-        else {
-            itemModelResolver.updateForTopItem(renderState, stack, displayContext, null, null, 0);
-        }
-
-        return renderState;
+        return Mth.lerp(delta, start, end);
     }
 
-    /// Create and populate a [BlockModelRenderState] for a given [BlockState] for rendering
-    ///
-    /// Should typically be called during [GeoRenderState] extraction prior to render submission
-    public static BlockModelRenderState createRenderStateForBlock(BlockState blockState, BlockModelResolver blockModelResolver) {
-        return createRenderStateForBlock(blockState, blockModelResolver, BlockDisplayContext.create());
+    /**
+     * Gets a {@link HydraModel} instance from a given {@link EntityType}
+     * <p>
+     * This only works if you're calling this method for an EntityType known to be using a {@link HydraRenderer Hydra Renderer}
+     * <p>
+     * Generally speaking you probably shouldn't be calling this method at all.
+     *
+     * @param entityType The {@code EntityType} to retrieve the HydraModel for
+     * @return The HydraModel, or null if one isn't found
+     */
+    @Nullable
+    public static HydraModel<?> getHydraModelForEntityType(EntityType<?> entityType) {
+        EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(entityType);
+
+        return renderer instanceof HydraRenderer<?> hydraRenderer ? hydraRenderer.getHydraModel() : null;
     }
 
-    /// Create and populate a [BlockModelRenderState] for a given [BlockState] for rendering
-    ///
-    /// Should typically be called during [GeoRenderState] extraction prior to render submission
-    public static BlockModelRenderState createRenderStateForBlock(BlockState blockState, BlockModelResolver blockModelResolver, BlockDisplayContext displayContext) {
-        final BlockModelRenderState renderState = new BlockModelRenderState();
+    /**
+     * Gets a HydraAnimatable instance that has been registered as the replacement renderer for a given {@link EntityType}
+     *
+     * @param entityType The {@code EntityType} to retrieve the replaced {@link HydraAnimatable} for
+     * @return The {@code HydraAnimatable} instance, or null if one isn't found
+     */
+    @Nullable
+    public static HydraAnimatable getReplacedAnimatable(EntityType<?> entityType) {
+        EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(entityType);
 
-        blockModelResolver.update(renderState, blockState, displayContext);
-
-        return renderState;
+        return renderer instanceof HydraReplacedEntityRenderer<?, ?> replacedEntityRenderer ? replacedEntityRenderer.getAnimatable() : null;
     }
 
-	/// Helper method to create the glowmask resource location for a given input texture
-	public static Identifier getEmissiveResource(Identifier textureLocation) {
-		return textureLocation.withPath(path -> path.replace(".png", "_glowmask.png"));
-	}
+    /**
+     * Gets a {@link HydraModel} instance from a given {@link Entity}
+     * <p>
+     * This only works if you're calling this method for an Entity known to be using a {@link HydraRenderer Hydra Renderer}
+     * <p>
+     * Generally speaking you probably shouldn't be calling this method at all.
+     *
+     * @param entity The {@code Entity} to retrieve the HydraModel for
+     * @return The HydraModel, or null if one isn't found
+     */
+    @Nullable
+    public static HydraModel<?> getHydraModelForEntity(Entity entity) {
+        EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().getRenderer(entity);
 
-    /// Gets a registered [GeoReplacedEntityRenderer] for a given [Entity] if it has had its renderer replaced
-    ///
-    /// @param entityType The [EntityType] to retrieve the replaced renderer for
-    /// @return The Hydra replaced renderer for the given entity, or null if not applicable
-    public static @Nullable GeoReplacedEntityRenderer<?, ?, ?> getReplacedEntityRenderer(EntityType<?> entityType) {
-        return Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(entityType) instanceof GeoReplacedEntityRenderer<?, ?, ?> replacedEntityRenderer ? replacedEntityRenderer : null;
+        return renderer instanceof HydraRenderer<?> hydraRenderer ? hydraRenderer.getHydraModel() : null;
     }
 
-    /// Gets a registered [GeoItemRenderer] for a given [Item], if applicable
-    ///
-    /// @param item The item to retrieve the renderer for
-    /// @return The GeoItemRenderer instance, or null if not applicable
-    public static @Nullable GeoItemRenderer<?> getHydraItemRenderer(Item item) {
-        return GeoRenderProvider.of(item).getGeoItemRenderer();
+    /**
+     * Gets a {@link HydraModel} instance from a given {@link Item}
+     * <p>
+     * This only works if you're calling this method for an Item known to be using a {@link HydraRenderer Hydra Renderer}
+     * <p>
+     * Generally speaking you probably shouldn't be calling this method at all.
+     *
+     * @param item The {@code ItemStack} to retrieve the HydraModel for
+     * @return The HydraModel, or null if one isn't found
+     */
+    @Nullable
+    public static HydraModel<?> getHydraModelForItem(ItemStack item) {
+        return HydraServices.Client.ITEM_RENDERING.getHydraModelForItem(item);
     }
 
-    /// Gets a registered [GeoEntityRenderer] for a given [EntityType], if applicable
-    ///
-    /// @param entityType The `EntityType` to retrieve the renderer for
-    /// @return The `GeoEntityRenderer` instance, or null if not applicable
-    public static @Nullable GeoEntityRenderer<?, ?> getHydraEntityRenderer(EntityType<?> entityType) {
-        return Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(entityType) instanceof GeoEntityRenderer<?, ?> geoEntityRenderer ? geoEntityRenderer : null;
+    /**
+     * Gets a {@link HydraModel} instance from a given {@link BlockEntity}
+     * <p>
+     * This only works if you're calling this method for a BlockEntity known to be using a {@link HydraRenderer Hydra Renderer}
+     * <p>
+     * Generally speaking you probably shouldn't be calling this method at all
+     *
+     * @param blockEntity The {@code BlockEntity} to retrieve the HydraModel for
+     * @return The HydraModel, or null if one isn't found
+     */
+    @Nullable
+    public static HydraModel<?> getHydraModelForBlock(BlockEntity blockEntity) {
+        BlockEntityRenderer<?> renderer = Minecraft.getInstance().getBlockEntityRenderDispatcher().getRenderer(blockEntity);
+
+        return renderer instanceof HydraRenderer<?> hydraRenderer ? hydraRenderer.getHydraModel() : null;
     }
 
-    /// Gets a registered [GeoBlockRenderer] for a given [BlockEntityType], if applicable
-    ///
-    /// @param blockEntityType The `BlockEntityType` to retrieve the renderer for
-    /// @return The `GeoBlockRenderer` instance, or null if not applicable
-    public static @Nullable GeoBlockRenderer<?, ?> getHydraBlockRenderer(BlockEntityType<?> blockEntityType) {
-        return Minecraft.getInstance().getBlockEntityRenderDispatcher().renderers.get(blockEntityType) instanceof GeoBlockRenderer<?, ?> geoBlockRenderer ? geoBlockRenderer : null;
+    /**
+     * Gets a {@link HydraModel} instance from a given {@link Item}
+     * <p>
+     * This only works if you're calling this method for an Item known to be using a {@link com.github.syren_dev_tech.hydra.renderer.HydraArmorRenderer HydraArmorRenderer}
+     * <p>
+     * Generally speaking you probably shouldn't be calling this method at all
+     *
+     * @param stack The ItemStack to retrieve the HydraModel for
+     * @return The HydraModel, or null if one isn't found
+     */
+    @Nullable
+    public static HydraModel<?> getHydraModelForArmor(ItemStack stack) {
+        return HydraServices.Client.ITEM_RENDERING.getHydraModelForArmor(stack);
     }
-
-    /// Gets a registered [GeoArmorRenderer] for a given [Item], if applicable
-    ///
-    /// @param item The `Item` to retrieve the renderer for
-    /// @return The `GeoArmorRenderer` instance, or null if not applicable
-    /// @see #getHydraArmorRenderer(ItemStack, EquipmentSlot)
-    @SuppressWarnings({"DataFlowIssue", "ConstantValue"})
-    public static @Nullable GeoArmorRenderer<?, ?> getHydraArmorRenderer(Item item) {
-        final ItemStack stack = item.getDefaultInstance();
-        final Equippable equippable = stack.getOrDefault(DataComponents.EQUIPPABLE, null);
-
-        if (equippable == null)
-            return null;
-
-        return getHydraArmorRenderer(stack, equippable.slot());
-    }
-
-    /// Gets a registered [GeoArmorRenderer] for a given [ItemStack], if applicable
-    ///
-    /// @param stack The `ItemStack` to retrieve the renderer for
-    /// @param slot The [EquipmentSlot] to retrieve the renderer for
-    /// @return The `GeoArmorRenderer` instance, or null if not applicable
-    public static @Nullable GeoArmorRenderer<?, ?> getHydraArmorRenderer(ItemStack stack, EquipmentSlot slot) {
-        return GeoRenderProvider.of(stack).getGeoArmorRenderer(stack, slot);
-    }
-
-    /// Gets a GeoAnimatable instance that has been registered as the replacement renderer for a given [EntityType]
-    ///
-    /// @param entityType The `EntityType` to retrieve the replaced [GeoAnimatable] for
-    /// @return The `GeoAnimatable` instance, or null if one isn't found
-    public static @Nullable GeoAnimatable getReplacedAnimatable(EntityType<?> entityType) {
-        final GeoReplacedEntityRenderer<?, ?, ?> replacedEntityRenderer = getReplacedEntityRenderer(entityType);
-
-        return replacedEntityRenderer == null ? null : replacedEntityRenderer.getAnimatable();
-    }
-
-    private RenderUtil() {}
 }

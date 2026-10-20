@@ -3,35 +3,31 @@ package com.github.syren_dev_tech.hydra.mixin.client;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.HumanoidModel;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.entity.RenderLayerParent;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
-import net.minecraft.client.renderer.entity.layers.RenderLayer;
-import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.LivingEntity;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import com.github.syren_dev_tech.hydra.renderer.GeoArmorRenderer;
-import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderState;
+import com.github.syren_dev_tech.hydra.util.InternalUtil;
 
+/**
+ * Injection into the render point for armour on HumanoidModels (Players, Zombies, etc) to defer to Hydra item-armor rendering as applicable
+ * <p>
+ * Does nothing if Hydra has nothing to handle for the given arguments
+ */
 @Mixin(HumanoidArmorLayer.class)
-public abstract class HumanoidArmorLayerMixin<S extends HumanoidRenderState, M extends HumanoidModel<S>, A extends HumanoidModel<S>> extends RenderLayer<S, M> {
-    public HumanoidArmorLayerMixin(RenderLayerParent<S, M> renderer) {
-        super(renderer);
-    }
+public abstract class HumanoidArmorLayerMixin<T extends LivingEntity, M extends HumanoidModel<T>, A extends HumanoidModel<T>> {
+    @Shadow
+    protected abstract void setPartVisibility(A baseModel, EquipmentSlot equipmentSlot);
 
-    /// Injection into the render point for armor on HumanoidModels (Players, Zombies, etc.) to defer to Hydra item-armor rendering as applicable
-    ///
-    /// Does nothing if Hydra has nothing to handle for the given arguments
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    @WrapWithCondition(method = "submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/HumanoidRenderState;FF)V",
+    @WrapWithCondition(method = "render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;ILnet/minecraft/world/entity/LivingEntity;FFFFFF)V",
             at = @At(
                     value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/entity/layers/HumanoidArmorLayer;renderArmorPiece(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/entity/EquipmentSlot;ILnet/minecraft/client/renderer/entity/state/HumanoidRenderState;)V"))
-    public boolean hydra$wrapArmorPieceRender(HumanoidArmorLayer<S, M, A> layer, PoseStack poseStack, SubmitNodeCollector renderTasks, ItemStack stack, EquipmentSlot slot, int packedLight, S entityRenderState) {
-        return entityRenderState instanceof HumanoidRenderState && !GeoArmorRenderer.tryRenderGeoArmorPiece(
-                (renderState, equipmentSlot) -> (HumanoidModel)layer.getArmorModel((S)renderState, equipmentSlot),
-                poseStack, renderTasks, stack, slot, packedLight, (HumanoidRenderState)entityRenderState);
+                    target = "Lnet/minecraft/client/renderer/entity/layers/HumanoidArmorLayer;renderArmorPiece(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/entity/EquipmentSlot;ILnet/minecraft/client/model/HumanoidModel;FFFFFF)V"))
+    public boolean hydra$wrapArmorPieceRender(HumanoidArmorLayer<T, M, A> renderLayer, PoseStack poseStack, MultiBufferSource bufferSource, T entity, EquipmentSlot equipmentSlot, int packedLight, A baseModel,
+                                                 float limbSwing, float limbSwingAmount, float partialTick, float lerpedTickCount, float netHeadYaw, float headPitch) {
+        return !InternalUtil.tryRenderHydraArmorPiece(poseStack, bufferSource, entity, entity.getItemBySlot(equipmentSlot), equipmentSlot, renderLayer.getParentModel(), baseModel, partialTick, packedLight, limbSwing, limbSwingAmount, lerpedTickCount, netHeadYaw, headPitch, this::setPartVisibility);
     }
 }

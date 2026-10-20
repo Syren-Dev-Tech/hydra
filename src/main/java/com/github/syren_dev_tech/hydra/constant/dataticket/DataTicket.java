@@ -1,71 +1,40 @@
 package com.github.syren_dev_tech.hydra.constant.dataticket;
 
-import com.google.common.reflect.TypeToken;
-import it.unimi.dsi.fastutil.Pair;
-
-import java.lang.reflect.Type;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 
-/// Ticket object to define a typed data object
-///
-/// @param <D> Data type for this ticket
+/**
+ * Ticket object to define a typed data object
+ */
 public class DataTicket<D> {
-	static final Map<Pair<Type, String>, DataTicket<?>> IDENTITY_CACHE = new ConcurrentHashMap<>();
-
 	private final String id;
-	private final Type dataType;
+	private final Class<? extends D> objectType;
 
-	/// @see #create(String, Class)
-	DataTicket(String id, Type dataType) {
+	public DataTicket(String id, Class<? extends D> objectType) {
 		this.id = id;
-		this.dataType = dataType;
-	}
-
-	/// Create a new DataTicket for a given name and object type
-	///
-	/// This DataTicket should then be stored statically somewhere and re-used.
-	@SuppressWarnings({"unchecked", "rawtypes"})
-    public static <D> DataTicket<D> create(String id, Class<? extends D> objectType) {
-		return create(id, (TypeToken)TypeToken.of(objectType));
-	}
-
-	/// Create a new DataTicket for a given name and object type
-	///
-	/// This DataTicket should then be stored statically somewhere and re-used.
-	@SuppressWarnings("unchecked")
-    public static <D> DataTicket<D> create(String id, TypeToken<D> token) {
-		return (DataTicket<D>)IDENTITY_CACHE.computeIfAbsent(Pair.of(token.getType(), id), _ -> new DataTicket<>(id, token.getType()));
+		this.objectType = objectType;
 	}
 
 	public String id() {
 		return this.id;
 	}
 
-	/// Get the java object type that this DataTicket's data is for
-	public Type dataType() {
-		return this.dataType;
+	public Class<? extends D> objectType() {
+		return this.objectType;
 	}
 
 	@Override
 	public int hashCode() {
-		return Objects.hash(this.id, this.dataType);
+		return Objects.hash(this.id, this.objectType);
 	}
 
-	@Override
-	public boolean equals(Object obj) {
-		if (this == obj)
-			return true;
-
-		if (!(obj instanceof DataTicket<?> other))
-			return false;
-
-		return this.dataType == other.dataType && this.id.equals(other.id);
-	}
-
-	@Override
-	public String toString() {
-		return "DataTicket{" + this.id + ": " + this.dataType.getTypeName() + "}";
+	/**
+	 * Reverse getter function for consistent operation of ticket data retrieval
+	 *
+	 * @param dataMap The data map to retrieve the data from
+	 * @return The data from the map, or null if the data hasn't been stored
+	 */
+	public <D> D getData(Map<? extends DataTicket<?>, ?> dataMap) {
+		return (D)dataMap.get(this);
 	}
 }

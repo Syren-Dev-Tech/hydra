@@ -1,15 +1,16 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.generic;
 
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
-import org.jspecify.annotations.Nullable;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the arc-cosine of the input value angle (in radians)
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the arc-cosine of the input value angle (in radians)
+ */
 public final class ACosFunction extends MathFunction {
     private final MathValue value;
 
@@ -25,8 +26,8 @@ public final class ACosFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        final double value = this.value.get(controllerState);
+    public double compute() {
+        final double value = this.value.get();
 
         if (value >= 1)
             return 0;

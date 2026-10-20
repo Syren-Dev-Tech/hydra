@@ -16,22 +16,27 @@ import com.github.syren_dev_tech.hydra.HydraConstants;
 import com.github.syren_dev_tech.hydra.network.packet.MultiloaderPacket;
 import com.github.syren_dev_tech.hydra.service.HydraNetworking;
 
-/// NeoForge service implementation for Hydra's networking functionalities
+import java.util.function.Consumer;
+
+/**
+ * NeoForge service implementation for Hydra's networking functionalities
+ */
 public class HydraNetworkingNeoForge implements HydraNetworking {
     private static PayloadRegistrar registrar = null;
 
     public static void init(IEventBus modBus) {
-        modBus.addListener(RegisterPayloadHandlersEvent.class, event -> {
+        modBus.addListener((Consumer<RegisterPayloadHandlersEvent>) event -> {
             registrar = event.registrar(HydraConstants.MODID).optional();
             HydraNetworking.init();
             registrar = null;
         });
     }
 
-    /// Register a Hydra packet for use
-    ///
-    /// **<u>FOR HYDRA USE ONLY</u>**
-    @SuppressWarnings("unchecked")
+    /**
+     * Register a Hydra packet for use
+     * <p>
+     * <b><u>FOR HYDRA USE ONLY</u></b>
+     */
     @Override
     public <B extends FriendlyByteBuf, P extends MultiloaderPacket> void registerPacketInternal(CustomPacketPayload.Type<P> payloadType, StreamCodec<B, P> codec, boolean isClientBound) {
         if (isClientBound) {
@@ -42,23 +47,29 @@ public class HydraNetworkingNeoForge implements HydraNetworking {
         }
     }
 
-    /// Send a packet to all players currently tracking a given entity
-    ///
-    /// Good as a shortcut for sending a packet to all players that may have an interest in a given entity or its dealings
-    ///
-    /// Will also send the packet to the entity itself if the entity is also a player
+    /**
+     * Send a packet to all players currently tracking a given entity
+     * <p>
+     * Good as a shortcut for sending a packet to all players that may have an interest in a given entity or its dealings
+     * <p>
+     * Will also send the packet to the entity itself if the entity is also a player
+     */
     @Override
     public void sendToAllPlayersTrackingEntity(MultiloaderPacket packet, Entity trackingEntity) {
         PacketDistributor.sendToPlayersTrackingEntityAndSelf(trackingEntity, packet);
     }
 
-    /// Send a packet to all players tracking a given block position
+    /**
+     * Send a packet to all players tracking a given block position
+     */
     @Override
     public void sendToAllPlayersTrackingBlock(MultiloaderPacket packet, ServerLevel level, BlockPos pos) {
-        PacketDistributor.sendToPlayersTrackingChunk(level, ChunkPos.containing(pos), packet);
+        PacketDistributor.sendToPlayersTrackingChunk(level, new ChunkPos(pos), packet);
     }
 
-    /// Send a packet to the given player
+    /**
+     * Send a packet to the given player
+     */
     @Override
     public void sendToPlayer(MultiloaderPacket packet, ServerPlayer player) {
         PacketDistributor.sendToPlayer(player, packet);

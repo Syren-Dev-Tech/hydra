@@ -1,20 +1,19 @@
 package com.github.syren_dev_tech.hydra.loading.math.value;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 
-import java.util.Set;
-
-/// [MathValue] value supplier
-///
-/// **Contract:**
-///
-/// Returns **1** if the contained value is equal to **0**, otherwise returns **0**
+/**
+ * {@link MathValue} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns <b>1</b> if the contained value is equal to <b>0</b>, otherwise returns <b>0</b>
+ */
 public record BooleanNegate(MathValue value) implements MathValue {
     @Override
-    public double get(@Nullable ControllerState controllerState) {
-        return this.value.get(controllerState) == 0 ? 1 : 0;
+    public double get() {
+        return this.value.get() == 0 ? 1 : 0;
     }
 
     @Override
@@ -23,12 +22,7 @@ public record BooleanNegate(MathValue value) implements MathValue {
     }
 
     @Override
-    public Set<Variable> getUsedVariables() {
-        return this.value.getUsedVariables();
-    }
-
-    @Override
     public String toString() {
-        return "!" + this.value;
+        return "!" + this.value.toString();
     }
 }

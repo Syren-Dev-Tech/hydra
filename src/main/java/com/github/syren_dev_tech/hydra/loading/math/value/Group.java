@@ -1,20 +1,19 @@
 package com.github.syren_dev_tech.hydra.loading.math.value;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 
-import java.util.Set;
-
-/// [MathValue] value supplier
-///
-/// **Contract:**
-///
-/// An unaltered return of the stored MathValue
+/**
+ * {@link MathValue} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * An unaltered return of the stored MathValue
+ */
 public record Group(MathValue contents) implements MathValue {
     @Override
-    public double get(@Nullable ControllerState controllerState) {
-        return this.contents.get(controllerState);
+    public double get() {
+        return this.contents.get();
     }
 
     @Override
@@ -23,12 +22,7 @@ public record Group(MathValue contents) implements MathValue {
     }
 
     @Override
-    public Set<Variable> getUsedVariables() {
-        return this.contents.getUsedVariables();
-    }
-
-    @Override
     public String toString() {
-        return "(" + this.contents + ")";
+        return "(" + this.contents.toString() + ")";
     }
 }

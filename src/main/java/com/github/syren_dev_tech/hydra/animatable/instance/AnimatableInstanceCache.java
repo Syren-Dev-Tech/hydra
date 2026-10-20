@@ -1,74 +1,80 @@
 package com.github.syren_dev_tech.hydra.animatable.instance;
 
 import com.google.common.base.Suppliers;
-import net.minecraft.world.item.ItemStack;
 import org.apache.commons.lang3.mutable.MutableObject;
-import org.jspecify.annotations.Nullable;
 import com.github.syren_dev_tech.hydra.HydraServices;
-import com.github.syren_dev_tech.hydra.animatable.GeoAnimatable;
-import com.github.syren_dev_tech.hydra.animatable.SingletonGeoAnimatable;
-import com.github.syren_dev_tech.hydra.animatable.client.GeoRenderProvider;
-import com.github.syren_dev_tech.hydra.animatable.manager.AnimatableManager;
+import com.github.syren_dev_tech.hydra.animatable.HydraAnimatable;
+import com.github.syren_dev_tech.hydra.animatable.SingletonHydraAnimatable;
+import com.github.syren_dev_tech.hydra.animatable.client.HydraRenderProvider;
+import com.github.syren_dev_tech.hydra.animation.AnimatableManager;
 import com.github.syren_dev_tech.hydra.constant.dataticket.DataTicket;
 
 import java.util.function.Supplier;
 
-/// The base cache class responsible for returning the [AnimatableManager] for a given instanceof of a [GeoAnimatable]
-///
-/// This class is abstracted and not intended for direct use.<br/>
-/// See either [SingletonAnimatableInstanceCache] or [InstancedAnimatableInstanceCache]
+/**
+ * The base cache class responsible for returning the {@link AnimatableManager} for a given instanceof of a {@link HydraAnimatable}
+ * <p>
+ * This class is abstracted and not intended for direct use. See either {@link SingletonAnimatableInstanceCache} or {@link InstancedAnimatableInstanceCache}
+ */
 public abstract class AnimatableInstanceCache {
-	protected final GeoAnimatable animatable;
-	protected final Supplier<GeoRenderProvider> renderProvider;
+	protected final HydraAnimatable animatable;
+	protected final Supplier<HydraRenderProvider> renderProvider;
 
-	public AnimatableInstanceCache(GeoAnimatable animatable) {
+	public AnimatableInstanceCache(HydraAnimatable animatable) {
 		this.animatable = animatable;
 		this.renderProvider = Suppliers.memoize(() -> {
-			if (!(this.animatable instanceof SingletonGeoAnimatable singleton) || !HydraServices.PLATFORM.isPhysicalClient())
+			if (!(this.animatable instanceof SingletonHydraAnimatable singleton) || !HydraServices.PLATFORM.isPhysicalClient())
 				return null;
 
-			final MutableObject<GeoRenderProvider> consumer = new MutableObject<>(GeoRenderProvider.DEFAULT);
+			final MutableObject<HydraRenderProvider> consumer = new MutableObject<>(HydraRenderProvider.DEFAULT);
 
-			singleton.createGeoRenderer(consumer::setValue);
+			singleton.createHydraRenderer(consumer::setValue);
 
-			return consumer.get();
+			return consumer.getValue();
 		});
 	}
 
-	/// This creates or gets the cached animatable manager for any unique ID
-	///
-	/// For [ItemStack]s, this is typically a reserved ID provided by Hydra. `Entities` and `BlockEntities`
-	/// pass their position or int ID. They typically only have one [AnimatableManager] per cache anyway
-	///
-	/// @param uniqueId A unique ID. For every ID the same animation manager
-	///                 will be returned.
-	public abstract <T extends GeoAnimatable> AnimatableManager<T> getManagerForId(long uniqueId);
+	/**
+	 * This creates or gets the cached animatable manager for any unique ID
+	 * <p>
+	 * For itemstacks, this is typically a reserved ID provided by Hydra. {@code Entities} and {@code BlockEntities}
+	 * pass their position or int ID. They typically only have one {@link AnimatableManager} per cache anyway
+	 *
+	 * @param uniqueId A unique ID. For every ID the same animation manager
+	 *                 will be returned.
+	 */
+	public abstract <T extends HydraAnimatable> AnimatableManager<T> getManagerForId(long uniqueId);
 
-	/// Helper method to set a data point in the [manager][AnimatableManager#setAnimatableData] for this animatable
-	///
-	/// @param uniqueId The unique identifier for this animatable instance
-	/// @param dataTicket The DataTicket for the data
-	/// @param data The data to store
+	/**
+	 * Helper method to set a data point in the {@link AnimatableManager#setData manager} for this animatable
+	 *
+	 * @param uniqueId The unique identifier for this animatable instance
+	 * @param dataTicket The DataTicket for the data
+	 * @param data The data to store
+	 */
 	public <D> void addDataPoint(long uniqueId, DataTicket<D> dataTicket, D data) {
-		getManagerForId(uniqueId).setAnimatableData(dataTicket, data);
+		getManagerForId(uniqueId).setData(dataTicket, data);
 	}
 
-	/// Helper method to get a data point from the [data collection][AnimatableManager#getAnimatableData] for this animatable,
-	/// or null if the data isn't present
-	///
-	/// @param uniqueId The unique identifier for this animatable instance
-	/// @param dataTicket The DataTicket for the data
-	public <D> @Nullable D getDataPoint(long uniqueId, DataTicket<D> dataTicket) {
-		return getManagerForId(uniqueId).getAnimatableData(dataTicket);
+	/**
+	 * Helper method to get a data point from the {@link AnimatableManager#getData data collection} for this animatable
+	 *
+	 * @param uniqueId The unique identifier for this animatable instance
+	 * @param dataTicket The DataTicket for the data
+	 */
+	public <D> D getDataPoint(long uniqueId, DataTicket<D> dataTicket) {
+		return getManagerForId(uniqueId).getData(dataTicket);
 	}
 
-	/// Get the [GeoRenderProvider] for this animatable
-	///
-	/// Because only [SingletonGeoAnimatable]s use this functionality, this method should not be used for anything other than a SingletonGeoAnimatable
-	///
-	/// The returned object is upcast to Object for side-safety
-	///
-	/// @return The cached GeoRenderProvider instance for this animatable
+	/**
+	 * Get the {@link HydraRenderProvider} for this animatable
+	 * <p>
+	 * Because only {@link SingletonHydraAnimatable}s use this functionality, it this method should not be used and will always return null for anything other than a SingletonHydraAnimatable
+	 * <p>
+	 * The returned object is upcast to Object for side-safety
+	 *
+	 * @return The cached HydraRenderProvider instance for this animatable, or null if one does not exist
+	 */
 	public Object getRenderProvider() {
 		return this.renderProvider.get();
 	}

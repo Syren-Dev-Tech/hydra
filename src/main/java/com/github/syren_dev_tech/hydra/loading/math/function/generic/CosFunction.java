@@ -1,16 +1,17 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.generic;
 
 import net.minecraft.util.Mth;
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the cosine of the input value angle, with the input angle converted to radians
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the cosine of the input value angle, with the input angle converted to radians
+ */
 public final class CosFunction extends MathFunction {
     private final MathValue value;
 
@@ -26,8 +27,8 @@ public final class CosFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return Mth.cos((float)this.value.get(controllerState) * Mth.DEG_TO_RAD);
+    public double compute() {
+        return Mth.cos((float)this.value.get() * Mth.DEG_TO_RAD);
     }
 
     @Override

@@ -1,15 +1,16 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.round;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the closest value that is equal to the input value or closer to zero, and is equal to an integer
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the closest value that is equal to the input value or closer to zero, and is equal to an integer
+ */
 public final class TruncateFunction extends MathFunction {
     private final MathValue value;
 
@@ -25,8 +26,8 @@ public final class TruncateFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return (long)this.value.get(controllerState);
+    public double compute() {
+        return (long)this.value.get();
     }
 
     @Override

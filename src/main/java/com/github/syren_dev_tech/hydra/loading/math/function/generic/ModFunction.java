@@ -1,15 +1,16 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.generic;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the remainder value of the input value when modulo'd by the modulus value
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the remainder value of the input value when modulo'd by the modulus value
+ */
 public final class ModFunction extends MathFunction {
     private final MathValue value;
     private final MathValue modulus;
@@ -27,18 +28,8 @@ public final class ModFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        final double modulo = this.modulus.get(controllerState);
-
-        return modulo == 0 ? 0 : this.value.get(controllerState) % modulo;
-    }
-
-    @Override
-    public void validate(MathValue... inputs) throws IllegalArgumentException {
-        super.validate(inputs);
-
-        if (!this.modulus.isMutable() && this.modulus.get(null) == 0)
-            throw new IllegalArgumentException(String.format("Modulo function %s uses an invalid modulus!", this));
+    public double compute() {
+        return this.value.get() % this.modulus.get();
     }
 
     @Override

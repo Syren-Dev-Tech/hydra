@@ -1,15 +1,16 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.misc;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Converts the input value to degrees
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Converts the input value to degrees
+ */
 public final class ToDegFunction extends MathFunction {
     private final MathValue value;
 
@@ -25,8 +26,8 @@ public final class ToDegFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return Math.toDegrees(this.value.get(controllerState));
+    public double compute() {
+        return Math.toDegrees(this.value.get());
     }
 
     @Override

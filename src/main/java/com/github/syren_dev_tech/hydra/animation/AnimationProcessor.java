@@ -1,282 +1,316 @@
 package com.github.syren_dev_tech.hydra.animation;
 
-import com.github.syren_dev_tech.hydra.animatable.GeoAnimatable;
-import com.github.syren_dev_tech.hydra.animatable.manager.AnimatableManager;
-import com.github.syren_dev_tech.hydra.animation.object.EasingType;
-import com.github.syren_dev_tech.hydra.animation.state.AnimationPoint;
-import com.github.syren_dev_tech.hydra.animation.state.BoneSnapshot;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
-import com.github.syren_dev_tech.hydra.animation.state.EasingState;
-import com.github.syren_dev_tech.hydra.cache.animation.Animation;
-import com.github.syren_dev_tech.hydra.cache.animation.BoneAnimation;
-import com.github.syren_dev_tech.hydra.cache.animation.Keyframe;
-import com.github.syren_dev_tech.hydra.cache.model.GeoBone;
-import com.github.syren_dev_tech.hydra.constant.DataTickets;
-import com.github.syren_dev_tech.hydra.loading.math.MathValue;
-import com.github.syren_dev_tech.hydra.loading.math.MolangQueries;
-import com.github.syren_dev_tech.hydra.model.GeoModel;
-import com.github.syren_dev_tech.hydra.renderer.base.BoneSnapshots;
-import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderState;
-import com.github.syren_dev_tech.hydra.util.ClientUtil;
-import com.mojang.datafixers.util.Pair;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
-import org.jetbrains.annotations.ApiStatus;
-import org.jspecify.annotations.Nullable;
+import org.apache.logging.log4j.Level;
+import com.github.syren_dev_tech.hydra.HydraConstants;
+import com.github.syren_dev_tech.hydra.animatable.HydraAnimatable;
+import com.github.syren_dev_tech.hydra.animation.keyframe.AnimationPoint;
+import com.github.syren_dev_tech.hydra.animation.keyframe.BoneAnimationQueue;
+import com.github.syren_dev_tech.hydra.animation.state.BoneSnapshot;
+import com.github.syren_dev_tech.hydra.cache.object.BakedHydraModel;
+import com.github.syren_dev_tech.hydra.cache.object.HydraBone;
+import com.github.syren_dev_tech.hydra.loading.math.MolangQueries;
+import com.github.syren_dev_tech.hydra.model.HydraModel;
 
 import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Queue;
 
-/// Internal class for handling the processing of animations and animation-related functionality.
-///
-/// This is distinct from [AnimationController] in that the controller handles the _state_ of an animatable's animations,
-/// whereas AnimationProcessor handles the _logic_ of individual animations.
-@ApiStatus.Internal
-public class AnimationProcessor {
-    /// Perform the necessary preparations for the upcoming render pass and collect it to be passed along with the [GeoRenderState]
-    ///
-    /// @param animatable The animatable relevant to the upcoming render pass
-    /// @param renderState The [GeoRenderState] being built for the upcoming render pass
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    public static <T extends GeoAnimatable> void extractControllerStates(T animatable, GeoRenderState renderState, GeoModel<T> geoModel) {
-        final AnimatableManager<T> manager = (AnimatableManager) Objects.requireNonNull(renderState.getHydraData(DataTickets.ANIMATABLE_MANAGER));
-        final Collection<AnimationController<T>> controllers = manager.getAnimationControllers().values();
-        final double tick = renderState.getAnimatableAge();
-        final List<ControllerState> controllerStates = new ObjectArrayList<>(controllers.size());
+public class AnimationProcessor<T extends HydraAnimatable> {
+	private final Map<String, HydraBone> bones = new Object2ObjectOpenHashMap<>();
+	private final HydraModel<T> model;
 
-        manager.markRenderedAt(tick);
+	public boolean reloadAnimations = false;
 
-        if (!controllers.isEmpty()) {
-            final float partialTick = renderState.getPartialTick();
-            final Level level = ClientUtil.getLevel();
-            final Player player = ClientUtil.getClientPlayer();
-            final Vec3 cameraPos = ClientUtil.getCameraPos();
-            final double renderTime = tick - manager.getFirstRenderTick();
+	public AnimationProcessor(HydraModel<T> model) {
+		this.model = model;
+	}
 
-            if (level != null && player != null) {
-                for (AnimationController<T> controller : controllers) {
-                    MolangQueries.Actor<T> actor = new MolangQueries.Actor<>(animatable, renderState, controller, renderTime, partialTick, level, player, cameraPos);
-                    ControllerState controllerState = controller.extractControllerState(animatable, renderState, manager, actor, geoModel);
+	/**
+	 * Build an animation queue for the given {@link RawAnimation}
+	 *
+	 * @param animatable The animatable object being rendered
+	 * @param rawAnimation The raw animation to be compiled
+	 * @return A queue of animations and loop types to play
+	 */
+	public Queue<QueuedAnimation> buildAnimationQueue(T animatable, RawAnimation rawAnimation) {
+		LinkedList<QueuedAnimation> animations = new LinkedList<>();
+		boolean error = false;
 
-                    if (controllerState != null)
-                        controllerStates.add(controllerState);
-                }
-            }
-        }
+		for (RawAnimation.Stage stage : rawAnimation.getAnimationStages()) {
+			Animation animation = null;
 
-        renderState.addHydraData(DataTickets.ANIMATION_CONTROLLER_STATES, controllerStates.toArray(new ControllerState[0]));
-    }
+			if (stage.animationName() == RawAnimation.Stage.WAIT) { // This is intentional. Do not change this or Tslat will be unhappy
+				animation = Animation.generateWaitAnimation(stage.additionalTicks());
+			}
+			else {
+				try {
+					animation = this.model.getAnimation(animatable, stage.animationName());
+				}
+				catch (RuntimeException ex) {
+					HydraConstants.LOGGER.log(Level.ERROR, "Unable to find animation: " + stage.animationName() + " for " + animatable.getClass().getSimpleName());
 
-    /// Create the [BoneSnapshot]s for the upcoming render pass based on the provided [AnimationPoint]s
-    public static void createBoneSnapshots(ControllerState controllerState, BoneSnapshots snapshots) {
-        final AnimationPoint animation = controllerState.animationPoint();
-        final AnimationPoint prevAnimation = controllerState.prevAnimationPoint();
-        final EasingType easingOverride = controllerState.easingOverride();
-        final boolean additive = controllerState.additive();
-        final BoneAnimation[] boneAnimations = animation.animation().boneAnimations();
-        final Set<String> transitionedBones = controllerState.transitionTime() >= 0 ? new ObjectOpenHashSet<>(boneAnimations.length) : null;
+					error = true;
+					ex.printStackTrace();
+				}
+			}
 
-        for (int boneIndex = 0; boneIndex < boneAnimations.length; boneIndex++) {
-            final String boneName = boneAnimations[boneIndex].boneName();
-            final BoneSnapshot snapshot = snapshots.get(boneName).orElse(null);
+			if (animation != null)
+				animations.add(new QueuedAnimation(animation, stage.loopType()));
+		}
 
-            if (snapshot != null) {
-                if (transitionedBones != null)
-                    transitionedBones.add(boneName);
+		return error ? null : animations;
+	}
 
-                setSnapshotScale(snapshot, boneIndex, controllerState, additive, animation, prevAnimation, easingOverride);
-                setSnapshotRotation(snapshot, boneIndex, controllerState, additive, animation, prevAnimation, easingOverride);
-                setSnapshotTranslation(snapshot, boneIndex, controllerState, additive, animation, prevAnimation, easingOverride);
-            }
-        }
+	/**
+	 * Tick and apply transformations to the model based on the current state of the {@link AnimationController}
+	 *
+	 * @param animatable            The animatable object relevant to the animation being played
+	 * @param model                 The model currently being processed
+	 * @param animatableManager			The AnimatableManager instance being used for this animation processor
+	 * @param animTime              The internal tick counter kept by the {@link AnimatableManager} for this animatable
+	 * @param state                 An {@link AnimationState} instance applied to this render frame
+	 * @param crashWhenCantFindBone Whether to crash if unable to find a required bone, or to continue with the remaining bones
+	 */
+	public void tickAnimation(T animatable, HydraModel<T> model, AnimatableManager<T> animatableManager, double animTime, AnimationState<T> state, boolean crashWhenCantFindBone) {
+		Map<String, BoneSnapshot> boneSnapshots = updateBoneSnapshots(animatableManager.getBoneSnapshotCollection());
 
-        if (prevAnimation != null && transitionedBones != null) {
-            final ControllerState resetState = createTransitionControllerState(prevAnimation, controllerState, controllerState.transitionTime());
-            final BoneAnimation[] transitionBoneAnimations = prevAnimation.animation().boneAnimations();
+		for (AnimationController<T> controller : animatableManager.getAnimationControllers().values()) {
+			if (this.reloadAnimations) {
+				controller.forceAnimationReset();
+				controller.getBoneAnimationQueues().clear();
+			}
 
-            for (int boneIndex = 0; boneIndex < transitionBoneAnimations.length; boneIndex++) {
-                final String boneName = transitionBoneAnimations[boneIndex].boneName();
+			controller.isJustStarting = animatableManager.isFirstTick();
 
-                if (!transitionedBones.contains(boneName)) {
-                    BoneSnapshot snapshot = snapshots.get(boneName).orElse(null);
+			state.withController(controller);
+			controller.process(model, state, this.bones, boneSnapshots, animTime, crashWhenCantFindBone);
 
-                    if (snapshot != null) {
-                        setSnapshotScale(snapshot, boneIndex, resetState, additive, prevAnimation, null, easingOverride);
-                        setSnapshotRotation(snapshot, boneIndex, resetState, additive, prevAnimation, null, easingOverride);
-                        setSnapshotTranslation(snapshot, boneIndex, resetState, additive, prevAnimation, null, easingOverride);
-                    }
-                }
-            }
-        }
-    }
+			for (BoneAnimationQueue boneAnimation : controller.getBoneAnimationQueues().values()) {
+				HydraBone bone = boneAnimation.bone();
+				BoneSnapshot snapshot = boneSnapshots.get(bone.getName());
+				BoneSnapshot initialSnapshot = bone.getInitialSnapshot();
 
-    private static void setSnapshotScale(BoneSnapshot snapshot, int boneIndex, ControllerState controllerState, boolean additive,
-                                         AnimationPoint animation, @Nullable AnimationPoint prevAnimation, @Nullable EasingType easingOverride) {
-        float xScale = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.SCALE, AnimationPoint.Axis.X, easingOverride);
-        float yScale = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.SCALE, AnimationPoint.Axis.Y, easingOverride);
-        float zScale = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.SCALE, AnimationPoint.Axis.Z, easingOverride);
+				AnimationPoint rotXPoint = boneAnimation.rotationXQueue().poll();
+				AnimationPoint rotYPoint = boneAnimation.rotationYQueue().poll();
+				AnimationPoint rotZPoint = boneAnimation.rotationZQueue().poll();
+				AnimationPoint posXPoint = boneAnimation.positionXQueue().poll();
+				AnimationPoint posYPoint = boneAnimation.positionYQueue().poll();
+				AnimationPoint posZPoint = boneAnimation.positionZQueue().poll();
+				AnimationPoint scaleXPoint = boneAnimation.scaleXQueue().poll();
+				AnimationPoint scaleYPoint = boneAnimation.scaleYQueue().poll();
+				AnimationPoint scaleZPoint = boneAnimation.scaleZQueue().poll();
+				EasingType easingType = controller.overrideEasingTypeFunction.apply(animatable);
 
-        if (additive) {
-            xScale *= snapshot.getScaleX();
-            yScale *= snapshot.getScaleY();
-            zScale *= snapshot.getScaleZ();
-        }
+				if (rotXPoint != null && rotYPoint != null && rotZPoint != null) {
+					bone.setRotX((float)EasingType.lerpWithOverride(rotXPoint, easingType) + initialSnapshot.getRotX());
+					bone.setRotY((float)EasingType.lerpWithOverride(rotYPoint, easingType) + initialSnapshot.getRotY());
+					bone.setRotZ((float)EasingType.lerpWithOverride(rotZPoint, easingType) + initialSnapshot.getRotZ());
+					snapshot.updateRotation(bone.getRotX(), bone.getRotY(), bone.getRotZ());
+					snapshot.startRotAnim();
+					bone.markRotationAsChanged();
+				}
 
-        snapshot.setScale(xScale, yScale, zScale);
-    }
+				if (posXPoint != null && posYPoint != null && posZPoint != null) {
+					bone.setPosX((float)EasingType.lerpWithOverride(posXPoint, easingType));
+					bone.setPosY((float)EasingType.lerpWithOverride(posYPoint, easingType));
+					bone.setPosZ((float)EasingType.lerpWithOverride(posZPoint, easingType));
+					snapshot.updateOffset(bone.getPosX(), bone.getPosY(), bone.getPosZ());
+					snapshot.startPosAnim();
+					bone.markPositionAsChanged();
+				}
 
-    private static void setSnapshotRotation(BoneSnapshot snapshot, int boneIndex, ControllerState controllerState, boolean additive,
-                                            AnimationPoint animation, @Nullable AnimationPoint prevAnimation, @Nullable EasingType easingOverride) {
-        float xRot = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.ROTATION, AnimationPoint.Axis.X, easingOverride);
-        float yRot = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.ROTATION, AnimationPoint.Axis.Y, easingOverride);
-        float zRot = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.ROTATION, AnimationPoint.Axis.Z, easingOverride);
+				if (scaleXPoint != null && scaleYPoint != null && scaleZPoint != null) {
+					bone.setScaleX((float)EasingType.lerpWithOverride(scaleXPoint, easingType));
+					bone.setScaleY((float)EasingType.lerpWithOverride(scaleYPoint, easingType));
+					bone.setScaleZ((float)EasingType.lerpWithOverride(scaleZPoint, easingType));
+					snapshot.updateScale(bone.getScaleX(), bone.getScaleY(), bone.getScaleZ());
+					snapshot.startScaleAnim();
+					bone.markScaleAsChanged();
+				}
+			}
+		}
 
-        if (additive) {
-            GeoBone bone = snapshot.getBone();
-            xRot += snapshot.getRotX() - bone.baseRotX();
-            yRot += snapshot.getRotY() - bone.baseRotY();
-            zRot += snapshot.getRotZ() - bone.baseRotZ();
-        }
+		this.reloadAnimations = false;
+		double resetTickLength = animatable.getBoneResetTime();
 
-        snapshot.setRotation(xRot, yRot, zRot);
-    }
+		for (HydraBone bone : getRegisteredBones()) {
+			if (!bone.hasRotationChanged()) {
+				BoneSnapshot initialSnapshot = bone.getInitialSnapshot();
+				BoneSnapshot saveSnapshot = boneSnapshots.get(bone.getName());
 
-    private static void setSnapshotTranslation(BoneSnapshot snapshot, int boneIndex, ControllerState controllerState, boolean additive,
-                                               AnimationPoint animation, @Nullable AnimationPoint prevAnimation, @Nullable EasingType easingOverride) {
-        float xPos = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.TRANSLATION, AnimationPoint.Axis.X, easingOverride);
-        float yPos = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.TRANSLATION, AnimationPoint.Axis.Y, easingOverride);
-        float zPos = findAnimationPointValue(snapshot, controllerState, animation, prevAnimation, boneIndex, AnimationPoint.Transform.TRANSLATION, AnimationPoint.Axis.Z, easingOverride);
+				if (saveSnapshot.isRotAnimInProgress())
+					saveSnapshot.stopRotAnim(animTime);
 
-        if (additive) {
-            xPos += snapshot.getTranslateX();
-            yPos += snapshot.getTranslateY();
-            zPos += snapshot.getTranslateZ();
-        }
+				double percentageReset = resetTickLength == 0 ? 1 : Math.min((animTime - saveSnapshot.getLastResetRotationTick()) / resetTickLength, 1);
+				float initialRotX = initialSnapshot.getRotX();
+				float initialRotY = initialSnapshot.getRotY();
+				float initialRotZ = initialSnapshot.getRotZ();
+				float lastXRot = saveSnapshot.getRotX();
+				float lastYRot = saveSnapshot.getRotY();
+				float lastZRot = saveSnapshot.getRotZ();
 
-        snapshot.setTranslation(xPos, yPos, zPos);
-    }
+				// Let's capture suspected full-rotations and prevent them from back-lerping
+				// Far from perfect, but the best I can think of until I redo the system itself
+				if (percentageReset == 0) {
+					if (lastXRot != initialRotX && isSuspectedCompletedRotation(lastXRot)) {
+						lastXRot = initialRotX;
+						percentageReset = 1;
+					}
 
-    /// Compute the effective animation point value from the provided [AnimationPoint]s and associated values
-    public static float findAnimationPointValue(BoneSnapshot boneSnapshot, ControllerState controllerState, AnimationPoint animation, @Nullable AnimationPoint prevAnimation,
-                                                int boneIndex, AnimationPoint.Transform transform, AnimationPoint.Axis axis, @Nullable EasingType easingOverride) {
-        if (controllerState.transitionTime() >= 0) {
-            return prevAnimation != null ?
-                   findTransitionPointValue(boneSnapshot, controllerState, animation, prevAnimation, boneIndex, transform, axis, easingOverride) :
-                   findResetPointValue(boneSnapshot, controllerState, animation, boneIndex, transform, axis, easingOverride);
-        }
+					if (lastYRot != initialRotY && isSuspectedCompletedRotation(lastYRot)) {
+						lastYRot = initialRotY;
+						percentageReset = 1;
+					}
 
-        final Pair<Keyframe, Keyframe> keyframes = animation.getCurrentAndNextKeyframe(boneIndex, transform, axis, 0);
-        final Keyframe fromKeyframe = keyframes == null ? null : keyframes.getFirst();
-        final Keyframe toKeyframe = fromKeyframe == null ? null : keyframes.getSecond();
+					if (lastZRot != initialRotZ && isSuspectedCompletedRotation(lastZRot)) {
+						lastZRot = initialRotZ;
+						percentageReset = 1;
+					}
+				}
 
-        if (toKeyframe == null)
-            return transform.defaultValue;
+				bone.setRotX((float)Mth.lerp(percentageReset, lastXRot, initialRotX));
+				bone.setRotY((float)Mth.lerp(percentageReset, lastYRot, initialRotY));
+				bone.setRotZ((float)Mth.lerp(percentageReset, lastZRot, initialRotZ));
 
-        final double from = fromKeyframe.endValue().get(controllerState);
-        final double to = toKeyframe.endValue().get(controllerState);
-        final double delta = toKeyframe.length() == 0 ? 0 : (animation.animTime() - fromKeyframe.startTime()) / toKeyframe.length();
-        final EasingType easingType = easingOverride != null ? easingOverride : toKeyframe.easingType();
+				if (percentageReset >= 1)
+					saveSnapshot.updateRotation(bone.getRotX(), bone.getRotY(), bone.getRotZ());
+			}
 
-        if (easingType == EasingType.LINEAR)
-            return (float)Mth.lerp(delta, from, to);
+			if (!bone.hasPositionChanged()) {
+				BoneSnapshot initialSnapshot = bone.getInitialSnapshot();
+				BoneSnapshot saveSnapshot = boneSnapshots.get(bone.getName());
 
-        return (float)new EasingState(easingType, toKeyframe.easingArgs(), delta, from, to).interpolate(controllerState);
-    }
+				if (saveSnapshot.isPosAnimInProgress())
+					saveSnapshot.stopPosAnim(animTime);
 
-    /// Compute the effective animation point value from the provided [AnimationPoint]s, transitioning to the next animation
-    private static float findTransitionPointValue(BoneSnapshot boneSnapshot, ControllerState controllerState, AnimationPoint animation, AnimationPoint prevAnimation,
-                                                  int boneIndex, AnimationPoint.Transform transform, AnimationPoint.Axis axis, @Nullable EasingType easingOverride) {
-        final Keyframe toKeyframe = animation.getCurrentKeyframe(boneIndex, transform, axis);
+				double percentageReset = resetTickLength == 0 ? 1 : Math.min((animTime - saveSnapshot.getLastResetPositionTick()) / resetTickLength, 1);
 
-        if (toKeyframe == null)
-            return transform.defaultValue;
+				bone.setPosX((float)Mth.lerp(percentageReset, saveSnapshot.getOffsetX(), initialSnapshot.getOffsetX()));
+				bone.setPosY((float)Mth.lerp(percentageReset, saveSnapshot.getOffsetY(), initialSnapshot.getOffsetY()));
+				bone.setPosZ((float)Mth.lerp(percentageReset, saveSnapshot.getOffsetZ(), initialSnapshot.getOffsetZ()));
 
-        int prevBoneIndex = prevAnimation.findBoneIndex(boneSnapshot.getBone());
-        double from = prevBoneIndex < 0 ? transform.defaultValue :
-                      wrapRotation(findAnimationPointValue(boneSnapshot, createTransitionControllerState(prevAnimation, controllerState, -1),
-                                                           prevAnimation, null, prevBoneIndex, transform, axis, prevAnimation.easingOverride()), transform);
-        final double to = toKeyframe.startValue().get(controllerState);
-        final double delta = controllerState.transitionTicks() == 0 ? 1 : Math.min(1, controllerState.transitionTime() / ((float)controllerState.transitionTicks() / 20d));
-        final EasingType easingType = easingOverride != null ? easingOverride : toKeyframe.easingType();
+				if (percentageReset >= 1)
+					saveSnapshot.updateOffset(bone.getPosX(), bone.getPosY(), bone.getPosZ());
+			}
 
-        if (easingType == EasingType.LINEAR)
-            return (float)Mth.lerp(delta, from, to);
+			if (!bone.hasScaleChanged()) {
+				BoneSnapshot initialSnapshot = bone.getInitialSnapshot();
+				BoneSnapshot saveSnapshot = boneSnapshots.get(bone.getName());
 
-        return (float)new EasingState(easingType, toKeyframe.easingArgs(), delta, from, to).interpolate(controllerState);
-    }
+				if (saveSnapshot.isScaleAnimInProgress())
+					saveSnapshot.stopScaleAnim(animTime);
 
-    /**
-     * Create a new {@link ControllerState} instance based off the current state, but from the perspective of an animation being transitioned from
-     */
-    // TODO move this to the top of the chain so we only need create one instance where needed
-    private static ControllerState createTransitionControllerState(AnimationPoint prevAnimation, ControllerState controllerState, double transitionTime) {
-        return new ControllerState(prevAnimation, null, transitionTime, controllerState.transitionTicks(), controllerState.additive(), controllerState.easingOverride(),
-                                   controllerState.renderState(), controllerState.queryValues());
-    }
+				double percentageReset = resetTickLength == 0 ? 1 : Math.min((animTime - saveSnapshot.getLastResetScaleTick()) / resetTickLength, 1);
 
-    /// Compute the effective animation point value from the provided [AnimationPoint]s, resetting back to the base bone state
-    private static float findResetPointValue(BoneSnapshot boneSnapshot, ControllerState controllerState, AnimationPoint animation,
-                                             int boneIndex, AnimationPoint.Transform transform, AnimationPoint.Axis axis, @Nullable EasingType easingOverride) {
-        final ControllerState previousState = new ControllerState(controllerState.animationPoint(), null, -1, 0,
-                                                            controllerState.additive(), controllerState.easingOverride(), controllerState.renderState(), controllerState.queryValues());
-        final double delta = Math.min(1, controllerState.transitionTime() / ((double)controllerState.transitionTicks() / 20d));
-        final double from = wrapRotation(findAnimationPointValue(boneSnapshot, previousState, animation, null, boneIndex, transform, axis, easingOverride), transform);
-        final double to = getSnapshotResetTarget(boneSnapshot, transform, axis, controllerState.additive());
-        final EasingType easingType = easingOverride == null ? EasingType.LINEAR : easingOverride;
+				bone.setScaleX((float)Mth.lerp(percentageReset, saveSnapshot.getScaleX(), initialSnapshot.getScaleX()));
+				bone.setScaleY((float)Mth.lerp(percentageReset, saveSnapshot.getScaleY(), initialSnapshot.getScaleY()));
+				bone.setScaleZ((float)Mth.lerp(percentageReset, saveSnapshot.getScaleZ(), initialSnapshot.getScaleZ()));
 
-        if (easingType == EasingType.LINEAR)
-            return (float)Mth.lerp(delta, from, to);
+				if (percentageReset >= 1)
+					saveSnapshot.updateScale(bone.getScaleX(), bone.getScaleY(), bone.getScaleZ());
+			}
+		}
 
-        return (float)new EasingState(easingType, new MathValue[0], delta, from, to).interpolate(controllerState);
-    }
+		resetBoneTransformationMarkers();
+		animatableManager.finishFirstTick();
+	}
 
-    /// Get the base snapshot value to return to when resetting from an animation
-    private static float getSnapshotResetTarget(BoneSnapshot snapshot, AnimationPoint.Transform transform, AnimationPoint.Axis axis, boolean additive) {
-        if (!additive)
-            return transform.defaultValue;
+	/**
+	 * Bandaid helper to try to detect suspected completed rotations in an animation frame
+	 * <p>
+	 * By no means perfectly accurate, but is the best we can do until the system is changed
+	 */
+	private boolean isSuspectedCompletedRotation(float lastRotation) {
+		float rotations = Mth.abs(lastRotation / (360f * Mth.DEG_TO_RAD));
+		float partialRotation = 1 - (rotations - (int)rotations);
 
-        return switch (transform) {
-            case SCALE -> switch (axis) {
-                case X -> snapshot.getScaleX();
-                case Y -> snapshot.getScaleY();
-                case Z -> snapshot.getScaleZ();
-            };
-            case ROTATION -> switch (axis) {
-                case X -> snapshot.getRotX();
-                case Y -> snapshot.getRotY();
-                case Z -> snapshot.getRotZ();
-            };
-            case TRANSLATION -> switch (axis) {
-                case X -> snapshot.getTranslateX();
-                case Y -> snapshot.getTranslateY();
-                case Z -> snapshot.getTranslateZ();
-            };
-        };
-    }
+		return partialRotation == 1 || partialRotation < 0.026 * rotations;
+	}
 
-    /// Wraps keyframe values to be the nearest multiple of 360 degrees, so that resetting and transitioning don't result in massive backspins
-    private static double wrapRotation(double value, AnimationPoint.Transform transform) {
-        if (transform != AnimationPoint.Transform.ROTATION)
-            return value;
+	/**
+	 * Reset the transformation markers applied to each {@link HydraBone} ready for the next render frame
+	 */
+	private void resetBoneTransformationMarkers() {
+		getRegisteredBones().forEach(HydraBone::resetStateChanges);
+	}
 
-        return Mth.wrapDegrees(value * Mth.RAD_TO_DEG) * Mth.DEG_TO_RAD;
-    }
+	/**
+	 * Create new bone {@link BoneSnapshot} based on the bone's initial snapshot for the currently registered {@link HydraBone HydraBones},
+	 * filtered by the bones already present in the master snapshots map
+	 *
+	 * @param snapshots The master bone snapshots map from the related {@link AnimatableManager}
+	 * @return The input snapshots map, for easy assignment
+	 */
+	private Map<String, BoneSnapshot> updateBoneSnapshots(Map<String, BoneSnapshot> snapshots) {
+		for (HydraBone bone : getRegisteredBones()) {
+			if (!snapshots.containsKey(bone.getName()))
+				snapshots.put(bone.getName(), BoneSnapshot.copy(bone.getInitialSnapshot()));
+		}
 
-    /// Get the [Animation] associated with the given [RawAnimation.Stage]
-    ///
-    /// Returns null if an animation by the given name for the provided animatable doesn't exist
-    public static <T extends GeoAnimatable> @Nullable Animation getOrCreateAnimation(RawAnimation.Stage stage, T animatable, GeoModel<T> geoModel) {
-        // This is intentional. DO NOT CHANGE THIS or Tslat will be unhappy
-        //noinspection StringEquality
-        if (stage.animationName() == RawAnimation.Stage.WAIT)
-            return Animation.generateWaitAnimation(stage.waitTicks() / 20d);
+		return snapshots;
+	}
 
-        return geoModel.getBakedAnimation(animatable, stage.animationName());
-    }
+	/**
+	 * Gets a bone by name
+	 *
+	 * @param boneName The bone name
+	 * @return the bone
+	 */
+	public HydraBone getBone(String boneName) {
+		return this.bones.get(boneName);
+	}
+
+	/**
+	 * Adds the given bone to the bones list for this processor
+	 * <p>
+	 * This is normally handled automatically by Hydra
+	 * <p>
+	 * Failure to properly register a bone will break things.
+	 */
+	public void registerHydraBone(HydraBone bone) {
+		bone.saveInitialSnapshot();
+		this.bones.put(bone.getName(), bone);
+
+		for (HydraBone child : bone.getChildBones()) {
+			registerHydraBone(child);
+		}
+	}
+
+	/**
+	 * Clear the {@link HydraBone HydraBones} currently registered to the processor,
+	 * then prepares the processor for a new model
+	 * <p>
+	 * Should be called whenever switching models to render/animate
+	 */
+	public void setActiveModel(BakedHydraModel model) {
+		this.bones.clear();
+
+		for (HydraBone bone : model.topLevelBones()) {
+			registerHydraBone(bone);
+		}
+	}
+
+	/**
+	 * Get an iterable collection of the {@link HydraBone HydraBones} currently registered to the processor
+	 */
+	public Collection<HydraBone> getRegisteredBones() {
+		return this.bones.values();
+	}
+
+	/**
+	 * Apply transformations and settings prior to acting on any animation-related functionality
+	 */
+	public void preAnimationSetup(AnimationState<T> animationState, double animTime) {
+		MolangQueries.updateActor(animationState, animTime);
+		this.model.applyMolangQueries(animationState, animTime);
+	}
+
+	/**
+	 * {@link Animation} and {@link Animation.LoopType} override pair,
+	 * used to define a playable animation stage for a {@link HydraAnimatable}
+	 */
+	public record QueuedAnimation(Animation animation, Animation.LoopType loopType) {}
 }

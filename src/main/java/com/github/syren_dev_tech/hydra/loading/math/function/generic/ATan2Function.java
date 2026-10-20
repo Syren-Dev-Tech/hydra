@@ -1,16 +1,17 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.generic;
 
 import net.minecraft.util.Mth;
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the arc-tangent theta of the input rectangular coordinate values (y,x), with the output converted to degrees
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the arc-tangent theta of the input rectangular coordinate values (y,x), with the output converted to degrees
+ */
 public final class ATan2Function extends MathFunction {
     private final MathValue y;
     private final MathValue x;
@@ -28,8 +29,8 @@ public final class ATan2Function extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return Math.atan2(this.y.get(controllerState), this.x.get(controllerState)) * Mth.RAD_TO_DEG;
+    public double compute() {
+        return Math.atan2(this.y.get(), this.x.get()) * Mth.RAD_TO_DEG;
     }
 
     @Override

@@ -1,0 +1,11 @@
+plugins {
+    id 'java'
+}
+
+tasks.register('printAttributes') {
+    doLast {
+        configurations.compileClasspath.attributes.forEach { k, v ->
+            println "${k} = ${v}"
+        }
+    }
+}

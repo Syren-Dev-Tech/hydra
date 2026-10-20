@@ -1,15 +1,16 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.generic;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the input value raised to the power of the second input value
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the input value raised to the power of the second input value
+ */
 public final class PowFunction extends MathFunction {
     private final MathValue value;
     private final MathValue power;
@@ -27,8 +28,8 @@ public final class PowFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return Math.pow(this.value.get(controllerState), this.power.get(controllerState));
+    public double compute() {
+        return Math.pow(this.value.get(), this.power.get());
     }
 
     @Override

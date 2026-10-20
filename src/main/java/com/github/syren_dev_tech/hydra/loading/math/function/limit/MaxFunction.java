@@ -1,15 +1,16 @@
 package com.github.syren_dev_tech.hydra.loading.math.function.limit;
 
-import org.jspecify.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.function.MathFunction;
 
-/// [MathFunction] value supplier
-///
-/// **Contract:**
-///
-/// Returns the greater of the two input values
+/**
+ * {@link MathFunction} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * Returns the greater of the two input values
+ */
 public final class MaxFunction extends MathFunction {
     private final MathValue valueA;
     private final MathValue valueB;
@@ -27,8 +28,8 @@ public final class MaxFunction extends MathFunction {
     }
 
     @Override
-    public double compute(@Nullable ControllerState controllerState) {
-        return Math.max(this.valueA.get(controllerState), this.valueB.get(controllerState));
+    public double compute() {
+        return Math.max(this.valueA.get(), this.valueB.get());
     }
 
     @Override

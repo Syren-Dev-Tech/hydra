@@ -1,55 +1,77 @@
 package com.github.syren_dev_tech.hydra.loading.math.value;
 
-import com.github.syren_dev_tech.hydra.animation.state.ControllerState;
 import com.github.syren_dev_tech.hydra.loading.math.MathValue;
 import com.github.syren_dev_tech.hydra.loading.math.Operator;
-import org.apache.commons.lang3.mutable.MutableDouble;
-import org.jspecify.annotations.Nullable;
 
-import java.util.Set;
+/**
+ * {@link MathValue} value supplier
+ *
+ * <p>
+ * <b>Contract:</b>
+ * <br>
+ * A computed value of argA and argB defined by the contract of the {@link Operator}
+ */
+public final class Calculation implements MathValue {
+    private final Operator operator;
+    private final MathValue argA;
+    private final MathValue argB;
+    private final boolean isMutable;
 
-/// [MathValue] value supplier
-///
-/// **Contract:**
-///
-/// A computed value of argA and argB defined by the contract of the [Operator]
-public record Calculation(Operator operator, MathValue argA, MathValue argB, boolean isMutable, Set<Variable> usedVariables, MutableDouble cachedValue) implements MathValue {
+    private double cachedValue = Double.MIN_VALUE;
+
     public Calculation(Operator operator, MathValue argA, MathValue argB) {
-        this(operator, argA, argB, argA.isMutable() || argB.isMutable(), MathValue.collectUsedVariables(argA, argB), new MutableDouble(Double.MIN_VALUE));
+        this.operator = operator;
+        this.argA = argA;
+        this.argB = argB;
+        this.isMutable = this.argA.isMutable() || this.argB.isMutable();
+    }
+
+    public Operator operator() {
+        return this.operator;
+    }
+
+    public MathValue argA() {
+        return this.argA;
+    }
+
+    public MathValue argB() {
+        return this.argB;
     }
 
     @Override
-    public double get(@Nullable ControllerState controllerState) {
+    public double get() {
         if (this.isMutable)
-            return compute(controllerState);
+            return compute();
 
-        if (this.cachedValue.doubleValue() == Double.MIN_VALUE)
-            this.cachedValue.setValue(compute(controllerState));
+        if (this.cachedValue == Double.MIN_VALUE)
+            this.cachedValue = compute();
 
-        return this.cachedValue.doubleValue();
+        return this.cachedValue;
     }
 
-    private double compute(@Nullable ControllerState controllerState) {
+    private double compute() {
         if (this.operator == Operator.OR) {
-            return this.operator.compute(this.argA.get(controllerState), 0) != 0 ||
-                   this.operator.compute(0, this.argB.get(controllerState)) != 0 ? 1 : 0;
+            return this.operator.compute(this.argA.get(), 0) != 0 ||
+                    this.operator.compute(0, this.argB.get()) != 0 ?
+                    1 : 0;
         }
 
         if (this.operator == Operator.AND) {
-            return this.operator.compute(this.argA.get(controllerState), 1) != 0 &&
-                   this.operator.compute(1, this.argB.get(controllerState)) != 0 ? 1 : 0;
+            return this.operator.compute(this.argA.get(), 1) != 0 &&
+                    this.operator.compute(1, this.argB.get()) != 0 ?
+                    1 : 0;
         }
 
-        return this.operator.compute(this.argA.get(controllerState), this.argB.get(controllerState));
+        return this.operator.compute(this.argA.get(), this.argB.get());
     }
 
     @Override
-    public Set<Variable> getUsedVariables() {
-        return this.usedVariables;
+    public boolean isMutable() {
+        return this.isMutable;
     }
 
     @Override
     public String toString() {
-        return this.argA + " " + this.operator.symbol() + " " + this.argB;
+        return this.argA.toString() + " " + this.operator.symbol() + " " + this.argB.toString();
     }
 }
