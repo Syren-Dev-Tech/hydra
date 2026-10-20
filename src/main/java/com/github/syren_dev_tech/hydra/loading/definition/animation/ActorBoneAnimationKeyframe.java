@@ -1,0 +1,138 @@
+package com.github.syren_dev_tech.hydra.loading.definition.animation;
+
+import com.github.syren_dev_tech.hydra.HydraConstants;
+import com.github.syren_dev_tech.hydra.animation.object.EasingType;
+import com.github.syren_dev_tech.hydra.animation.state.AnimationPoint;
+import com.github.syren_dev_tech.hydra.cache.animation.Keyframe;
+import com.github.syren_dev_tech.hydra.loading.definition.animation.object.KeyframeTriplet;
+import com.github.syren_dev_tech.hydra.loading.math.MathParser;
+import com.github.syren_dev_tech.hydra.loading.math.MathValue;
+import com.github.syren_dev_tech.hydra.loading.math.function.misc.ToRadFunction;
+import com.github.syren_dev_tech.hydra.loading.math.value.Negative;
+import com.github.syren_dev_tech.hydra.util.JsonUtil;
+import com.google.gson.Gson;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParseException;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.util.GsonHelper;
+import net.minecraft.util.Mth;
+import org.jetbrains.annotations.ApiStatus;
+import org.jetbrains.annotations.Contract;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
+
+/// Container class for a single actor animation's bone animation keyframe,
+/// only used for intermediary steps between .json deserialization and Hydra object creation
+///
+/// Note that the timestamp for this keyframe is not contained here, and is instead held by the [ActorBoneAnimationEntry#keyframes()] map, if present
+///
+/// @param values The actual value for this keyframe. Can technically be null if only [#preKeyframe] or [#postKeyframe] are present
+/// @param interpolationType An optional interpolation/easing type declaration
+/// @param easingArgs An optional array of values to be used by the interpolation type for further customization
+/// @param preKeyframe An optional keyframe to insert directly prior to this keyframe, usually for interpolation purposes
+/// @param postKeyframe An optional keyframe to insert directly after this keyframe, usually for interpolation purposes
+/// @see <a href="https://learn.microsoft.com/en-us/minecraft/creator/reference/content/schemasreference/schemas/minecraftschema_actor_animation_1.8.0?view=minecraft-bedrock-stable">Bedrock Actor Animation Spec 1.8.0</a>
+@ApiStatus.Internal
+public record ActorBoneAnimationKeyframe(@Nullable ActorBoneAnimationKeyframeValues values, @Nullable String interpolationType, DoubleOrString @Nullable [] easingArgs,
+                                         @Nullable ActorBoneAnimationKeyframe preKeyframe, @Nullable ActorBoneAnimationKeyframe postKeyframe) {
+    public ActorBoneAnimationKeyframe {
+        preKeyframe = inheritParentEasings(interpolationType, easingArgs, preKeyframe);
+        postKeyframe = inheritParentEasings(interpolationType, easingArgs, postKeyframe);
+    }
+
+    /// Parse an ActorBoneAnimationKeyframe instance from raw .json input via [Gson]
+    public static JsonDeserializer<ActorBoneAnimationKeyframe> gsonDeserializer() throws JsonParseException {
+        return (json, _, context) -> {
+            if (json.isJsonObject()) {
+                final JsonObject obj = json.getAsJsonObject();
+                final ActorBoneAnimationKeyframeValues values = GsonHelper.getAsObject(obj, "vector", null, context, ActorBoneAnimationKeyframeValues.class);
+                final String interpolationType = obj.has("lerp_mode") ? obj.get("lerp_mode").getAsString() : obj.has("easing") ? obj.get("easing").getAsString() : null;
+                final DoubleOrString[] easingArgs = JsonUtil.jsonArrayToObjectArray(GsonHelper.getAsJsonArray(obj, "easingArgs", null), context, DoubleOrString.class);
+                final ActorBoneAnimationKeyframe preKeyframe = GsonHelper.getAsObject(obj, "pre", null, context, ActorBoneAnimationKeyframe.class);
+                final ActorBoneAnimationKeyframe postKeyframe = GsonHelper.getAsObject(obj, "post", null, context, ActorBoneAnimationKeyframe.class);
+
+                return new ActorBoneAnimationKeyframe(values, interpolationType, easingArgs, preKeyframe, postKeyframe);
+            }
+
+            if (json.isJsonPrimitive() || json.isJsonArray())
+                return new ActorBoneAnimationKeyframe(context.deserialize(json, ActorBoneAnimationKeyframeValues.class), null, null, null, null);
+
+            throw new JsonParseException("ActorBoneAnimationKeyframe has invalid format, expected either String, Array or JsonObject: " + json);
+        };
+    }
+
+    /// Bake this `ActorBoneAnimationKeyframe` instance into the final [Keyframe] instance array that Hydra uses for animating,
+    /// held in a [KeyframeTriplet] container for easy returning
+    ///
+    /// The returned array will be 0+ elements in length, depending on whether any pre or post keyframes are present
+    public KeyframeTriplet[] bake(double timestamp, AnimationPoint.Transform transformType, boolean forceLinearInterpolation, @Nullable KeyframeTriplet lastTriplet, MathParser mathParser) {
+        if (this.values == null && this.preKeyframe == null && this.postKeyframe == null) {
+            HydraConstants.LOGGER.warn("ActorBoneAnimationKeyframe has no values, pre, or post keyframes!");
+
+            return new KeyframeTriplet[0];
+        }
+
+        final List<KeyframeTriplet> triplets = new ObjectArrayList<>(3);
+
+        if (this.preKeyframe != null) {
+            KeyframeTriplet[] preKeyframeTriplets = this.preKeyframe.bake(timestamp - Mth.EPSILON, transformType, forceLinearInterpolation, lastTriplet, mathParser);
+
+            if (preKeyframeTriplets.length > 0) {
+                triplets.addAll(ObjectArrayList.of(preKeyframeTriplets));
+                lastTriplet = triplets.getLast();
+            }
+        }
+
+        if (this.values != null) {
+            triplets.add(bakeTriplet(timestamp, this.values, transformType, forceLinearInterpolation, lastTriplet, mathParser));
+            lastTriplet = triplets.getLast();
+        }
+
+        if (this.postKeyframe != null) {
+            KeyframeTriplet[] postKeyframeTriplets = this.postKeyframe.bake(timestamp + Mth.EPSILON, transformType, forceLinearInterpolation, lastTriplet, mathParser);
+
+            if (postKeyframeTriplets.length > 0)
+                triplets.addAll(ObjectArrayList.of(postKeyframeTriplets));
+        }
+
+        return triplets.toArray(new KeyframeTriplet[0]);
+    }
+
+    /// Bake the core [KeyframeTriplet] this instance represents
+    private KeyframeTriplet bakeTriplet(double timestamp, ActorBoneAnimationKeyframeValues values, AnimationPoint.Transform transformType, boolean forceLinearInterpolation,
+                                        @Nullable KeyframeTriplet lastTriplet, MathParser mathParser) {
+        final EasingType easingType = this.interpolationType == null || forceLinearInterpolation ? EasingType.LINEAR : EasingType.fromString(this.interpolationType);
+        final MathValue[] easingArgs = this.easingArgs == null ? new MathValue[0] : new MathValue[this.easingArgs.length];
+        final double prevTime = lastTriplet == null ? 0 : lastTriplet.x().startTime();
+        final double keyframeLength = timestamp - prevTime;
+        MathValue xValue = mathParser.compileDoubleOrString(values.xValue());
+        MathValue yValue = mathParser.compileDoubleOrString(values.yValue());
+        MathValue zValue = mathParser.compileDoubleOrString(values.zValue());
+
+        if (transformType == AnimationPoint.Transform.ROTATION) {
+            xValue = mathParser.wrap(xValue, Negative::new, ToRadFunction::new);
+            yValue = mathParser.wrap(yValue, Negative::new, ToRadFunction::new);
+            zValue = mathParser.wrap(zValue, ToRadFunction::new);
+        }
+
+        for (int i = 0; i < easingArgs.length; i++) {
+            easingArgs[i] = mathParser.compileDoubleOrString(this.easingArgs[i]);
+        }
+
+        return new KeyframeTriplet(timestamp, keyframeLength, lastTriplet, xValue, yValue, zValue, easingType, easingArgs);
+    }
+
+    /// Potentially inherit the parent bone keyframe's [EasingType] and easing args
+    ///
+    /// This is specifically for pre/post keyframe handles, where propagation of the easing type is required
+    @Contract("_,_,null->null")
+    private static @Nullable ActorBoneAnimationKeyframe inheritParentEasings(@Nullable String parentInterpolation, DoubleOrString @Nullable [] parentEasingArgs,
+                                                                             @Nullable ActorBoneAnimationKeyframe self) {
+        if (self == null || parentInterpolation == null || self.interpolationType != null)
+            return self;
+
+        return new ActorBoneAnimationKeyframe(self.values, parentInterpolation, parentEasingArgs, self.preKeyframe, self.postKeyframe);
+    }
+}

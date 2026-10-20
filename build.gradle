@@ -1,0 +1,107 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    alias(libs.plugins.moddevgradle)
+    alias(libs.plugins.minotaur)
+    alias(libs.plugins.curseforgegradle)
+}
+
+group = 'com.github.syren_dev_tech.hydra'
+version = '5.5.7' // Simplified version
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21) // Using a common version, adjust if needed
+    }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+neoForge {
+    // Accessing version from catalog. If it fails, it might need adjustment.
+    // For now, I'll use the version from the catalog if possible.
+    version = libs.versions.neoforge.get().requiredVersion
+
+    accessTransformers.files.setFrom(file("src/main/resources/META-INF/accesstransformer.cfg"))
+    validateAccessTransformers = true
+
+    interfaceInjectionData {
+        from(file("src/main/resources/META-INF/interface_injections.json"))
+        publish(file("src/main/resources/META-INF/interface_injections.json"))
+    }
+
+    runs {
+        configureEach {
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+
+        mods {
+            create('hydra') {
+                sourceSet(sourceSets.main.get())
+            }
+        }
+
+        register('client') {
+            client()
+        }
+
+        register('client2') {
+            client()
+            programArguments.addAll('--username', 'Player')
+        }
+
+        register('server') {
+            server()
+            programArgument '--nogui'
+        }
+    }
+}
+
+dependencies {
+    // Dependencies would go here
+}
+
+jar {
+    manifest {
+        attributes(
+            'Specification-Title': 'Hydra',
+            'Specification-Vendor': 'Hydra Authors',
+            'Specification-Version': version,
+            'Implementation-Title': 'Hydra',
+            'Implementation-Version': version,
+            'Implementation-Vendor': 'Hydra Authors',
+            'Built-On-Minecraft': libs.versions.minecraft.get().requiredVersion,
+            'MixinConfigs': 'hydra.mixins.json'
+        )
+    }
+}
+
+processResources {
+    inputs.property 'version', version
+    
+    filesMatching(['pack.mcmeta', 'fabric.mod.json', 'META-INF/neoforge.mods.toml', 'META-INF/mods.toml', '*.mixins.json']) {
+        expand(
+            version: version,
+            mod_id: 'hydra',
+            mod_display_name: 'Hydra',
+            mod_authors: 'Hydra Authors',
+            mod_contributors: 'Hydra Contributors',
+            mod_license: 'MIT',
+            mod_description: 'Hydra Lite',
+            minecraft_version: libs.versions.minecraft.get().requiredVersion
+        )
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        mavenLocal()
+    }
+}
+
+// Minotaur and CurseForge publishing tasks can be added here if needed

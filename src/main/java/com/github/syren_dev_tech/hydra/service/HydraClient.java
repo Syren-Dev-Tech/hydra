@@ -1,0 +1,39 @@
+package com.github.syren_dev_tech.hydra.service;
+
+import com.google.common.base.Suppliers;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.model.HumanoidModel;
+import net.minecraft.client.model.Model;
+import net.minecraft.client.model.geom.ModelLayers;
+import net.minecraft.client.model.object.equipment.ElytraModel;
+import net.minecraft.client.renderer.entity.ArmorModelSet;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
+import net.minecraft.client.resources.model.EquipmentClientInfo;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
+
+import java.util.function.Supplier;
+
+/// Loader-agnostic service interface for clientside functionalities
+public interface HydraClient {
+    Supplier<ArmorModelSet<HumanoidModel<?>>> HUMANOID_ARMOR_MODEL = Suppliers.memoize(() -> ArmorModelSet.bake(ModelLayers.PLAYER_ARMOR, Minecraft.getInstance().getEntityModels(), HumanoidModel::new));
+    Supplier<ElytraModel> GENERIC_ELYTRA_MODEL = Suppliers.memoize(() -> new ElytraModel(Minecraft.getInstance().getEntityModels().bakeLayer(ModelLayers.ELYTRA)));
+
+    /// Helper method for retrieving an (ideally) cached instance of the armor model for a given Item
+    ///
+    /// If no custom model applies to this item, the `defaultModel` is returned
+    <S extends HumanoidRenderState> Model<?> getArmorModelForItem(S entityRenderState, ItemStack stack, EquipmentSlot slot, EquipmentClientInfo.LayerType type, HumanoidModel<S> defaultModel);
+
+    /// Return the dye value for a given ItemStack, or the default value if not present.
+    ///
+    /// This is split off to allow for handling of loader-specific handling for dyed items
+    int getDyedItemColor(ItemStack itemStack, int defaultColor);
+
+    /// Handle a newly extracted [EntityRenderState] for data extensions
+    ///
+    /// This is mostly for third-party compatibility reasons
+    default <E extends Entity, S extends EntityRenderState> void handleEntityRenderStateExtraction(EntityRenderer<E, S> renderer, E entity, S renderState) {}
+}

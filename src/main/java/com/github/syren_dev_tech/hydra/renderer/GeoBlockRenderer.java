@@ -1,0 +1,237 @@
+package com.github.syren_dev_tech.hydra.renderer;
+
+import com.github.syren_dev_tech.hydra.HydraClientServices;
+import com.github.syren_dev_tech.hydra.animatable.GeoAnimatable;
+import com.github.syren_dev_tech.hydra.constant.DataTickets;
+import com.github.syren_dev_tech.hydra.constant.dataticket.DataTicket;
+import com.github.syren_dev_tech.hydra.model.DefaultedBlockGeoModel;
+import com.github.syren_dev_tech.hydra.model.GeoModel;
+import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderState;
+import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderer;
+import com.github.syren_dev_tech.hydra.renderer.base.RenderPassInfo;
+import com.github.syren_dev_tech.hydra.renderer.layer.GeoRenderLayer;
+import com.github.syren_dev_tech.hydra.renderer.layer.GeoRenderLayersContainer;
+import com.google.common.reflect.TypeToken;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.block.BlockModelResolver;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.ApiStatus;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
+
+/// Base [GeoRenderer] class for rendering [Blocks][BlockEntity] specifically
+///
+/// All blocks added to be rendered by Hydra should use an instance of this class.
+///
+/// @param <T> BlockEntity animatable class type
+/// @param <R> RenderState class type
+public class GeoBlockRenderer<T extends BlockEntity & GeoAnimatable, R extends BlockEntityRenderState> implements GeoRenderer<T, Void, R>, BlockEntityRenderer<T, R> {
+    @SuppressWarnings("unchecked")
+    protected static final EnumProperty<Direction>[] SUPPORTED_DIRECTION_PROPERTIES = new EnumProperty[] {BlockStateProperties.FACING, BlockStateProperties.HORIZONTAL_FACING, BlockStateProperties.VERTICAL_DIRECTION, BlockStateProperties.FACING_HOPPER };
+    public static final DataTicket<Direction> DIRECTION_FACING = DataTicket.create("geoblockrenderer_direction_facing", new TypeToken<>() {});
+	protected final GeoRenderLayersContainer<T, Void, R> renderLayers = new GeoRenderLayersContainer<>(this);
+	protected final GeoModel<T> model;
+    protected final BlockModelResolver blockModelResolver;
+
+	protected float scaleWidth = 1;
+	protected float scaleHeight = 1;
+
+    /// Creates a new defaulted renderer instance, using the BlockEntity's registered id as the file name for its assets
+    public GeoBlockRenderer(BlockEntityRendererProvider.Context context, BlockEntityType<? extends T> blockEntityType) {
+        this(context, new DefaultedBlockGeoModel<>(Objects.requireNonNull(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntityType))));
+    }
+
+	public GeoBlockRenderer(BlockEntityRendererProvider.Context context, GeoModel<T> model) {
+		this.model = model;
+        this.blockModelResolver = context.blockModelResolver();
+	}
+
+    /// Attempt to extract a direction from the block so that the model can be oriented correctly
+    protected Direction getBlockStateDirection(T blockEntity) {
+        BlockState blockState = blockEntity.getBlockState();
+
+        for (EnumProperty<Direction> property : SUPPORTED_DIRECTION_PROPERTIES) {
+            if (blockState.hasProperty(property))
+                return blockState.getValue(property);
+        }
+
+        return Direction.NORTH;
+    }
+
+    /// Rotate the [PoseStack] based on the determined [Direction] the block is facing
+    protected void tryRotateByBlockstate(RenderPassInfo<R> renderPassInfo, PoseStack poseStack) {
+        final Direction facing = renderPassInfo.getOrDefaultHydraData(DIRECTION_FACING, Direction.NORTH);
+
+        switch (facing) {
+            case SOUTH -> poseStack.rotateDegrees(Axis.YP, 180);
+            case WEST -> poseStack.rotateDegrees(Axis.YP, 90);
+            case EAST -> poseStack.rotateDegrees(Axis.YN, 90);
+            case UP -> poseStack.rotateDegrees(Axis.XP, 90);
+            case DOWN -> poseStack.rotateDegrees(Axis.XN, 90);
+            default -> {}
+        }
+    }
+
+    //<editor-fold defaultstate="collapsed" desc="<Internal Methods>">
+    /// Gets the model instance for this renderer
+    @Override
+    public GeoModel<T> getGeoModel() {
+        return this.model;
+    }
+
+    /// Returns the list of registered [GeoRenderLayers][GeoRenderLayer] for this renderer
+    @Override
+    public List<GeoRenderLayer<T, Void, R>> getRenderLayers() {
+        return this.renderLayers.getRenderLayers();
+    }
+
+    /// Adds a [GeoRenderLayer] to this renderer, to be called after the main model is rendered each frame
+    @SuppressWarnings("UnusedReturnValue")
+    public GeoBlockRenderer<T, R> withRenderLayer(Function<? super GeoBlockRenderer<T, R>, GeoRenderLayer<T, Void, R>> renderLayer) {
+        return withRenderLayer(renderLayer.apply(this));
+    }
+
+    /// Adds a [GeoRenderLayer] to this renderer, to be called after the main model is rendered each frame
+    public GeoBlockRenderer<T, R> withRenderLayer(GeoRenderLayer<T, Void, R> renderLayer) {
+        this.renderLayers.addLayer(renderLayer);
+
+        return this;
+    }
+
+    /// Sets a scale override for this renderer, telling Hydra to pre-scale the model
+    public GeoBlockRenderer<T, R> withScale(float scale) {
+        return withScale(scale, scale);
+    }
+
+    /// Sets a scale override for this renderer, telling Hydra to pre-scale the model
+    public GeoBlockRenderer<T, R> withScale(float scaleWidth, float scaleHeight) {
+        this.scaleWidth = scaleWidth;
+        this.scaleHeight = scaleHeight;
+
+        return this;
+    }
+
+    /// Gets the id that represents the current animatable's instance for animation purposes.
+    ///
+    /// @param animatable The Animatable instance being renderer
+    @ApiStatus.OverrideOnly
+    @Override
+    public long getInstanceId(T animatable, @Nullable Void ignored) {
+        return animatable.getBlockPos().hashCode();
+    }
+
+    /// Internal method for capturing the common RenderState data for all animatable objects
+    @ApiStatus.Internal
+    @Override
+    public void captureDefaultRenderState(T animatable, @Nullable Void relatedObject, R renderState, float partialTick) {
+        GeoRenderer.super.captureDefaultRenderState(animatable, relatedObject, renderState, partialTick);
+
+        renderState.addHydraData(DIRECTION_FACING, getBlockStateDirection(animatable));
+        renderState.addHydraData(DataTickets.POSITION, Vec3.atCenterOf(animatable.getBlockPos()));
+    }
+
+    /// Called at the start of the render compilation pass. PoseState manipulations have not yet taken place and typically should not be made here.
+    ///
+    /// Manipulation of the model's bones is not permitted here
+    ///
+    /// Use this method to handle any preparation or pre-work required for the render submission.
+    ///
+    /// @see #scaleModelForRender
+    /// @see #adjustRenderPose
+    /// @see #adjustModelBonesForRender
+    @Override
+    public void preRenderPass(RenderPassInfo<R> renderPassInfo, SubmitNodeCollector renderTasks) {
+        renderPassInfo.poseStack().translate(0.5d, 0, 0.5d);
+    }
+
+    /// Scales the [PoseStack] in preparation for rendering the model, excluding when re-rendering the model as part of a [GeoRenderLayer] or external render call
+    ///
+    /// Override and call `super` with modified scale values as needed to further modify the scale of the model
+    @Override
+    public void scaleModelForRender(RenderPassInfo<R> renderPassInfo, float widthScale, float heightScale) {
+        GeoRenderer.super.scaleModelForRender(renderPassInfo, this.scaleWidth * widthScale, this.scaleHeight * heightScale);
+    }
+
+    /// Transform the [PoseStack] in preparation for rendering the model.
+    ///
+    /// This is called after [#scaleModelForRender], and so any transformations here will be scaled appropriately.
+    /// If you need to do pre-scale translations, use [#preRenderPass]
+    ///
+    /// PoseStack translations made here are kept until the end of the render process
+    @Override
+    public void adjustRenderPose(RenderPassInfo<R> renderPassInfo) {
+        tryRotateByBlockstate(renderPassInfo, renderPassInfo.poseStack());
+    }
+
+    /// Initial access point for vanilla's [BlockEntityRenderer] interface
+    /// Immediately defers to [GeoRenderer#performRenderPass(GeoRenderState, PoseStack, SubmitNodeCollector, CameraRenderState)]
+    @ApiStatus.Internal
+    @Override
+    public void submit(R renderState, PoseStack poseStack, SubmitNodeCollector renderTasks, CameraRenderState cameraRenderState) {
+        GeoRenderer.super.performRenderPass(renderState, poseStack, renderTasks, cameraRenderState);
+    }
+
+    /// Default return for creating the [BlockEntityRenderState].
+    ///
+    /// You generally shouldn't need to override or use this
+    @SuppressWarnings("unchecked")
+    @ApiStatus.Internal
+    @Override
+    public R createRenderState() {
+        return (R)new BlockEntityRenderState();
+    }
+
+    /// Create the contextually relevant [BlockEntityRenderState] for the current render pass
+    @Override
+    public void extractRenderState(T blockEntity, R renderState, float partialTick, Vec3 cameraPos, ModelFeatureRenderer.@Nullable CrumblingOverlay damageOverlayState) {
+        BlockEntityRenderer.super.extractRenderState(blockEntity, renderState, partialTick, cameraPos, damageOverlayState);
+        fillRenderState(blockEntity, null, renderState, partialTick);
+    }
+
+    /// Create and fire the relevant `CompileLayers` event hook for this renderer
+    @Override
+    public void fireCompileRenderLayersEvent() {
+        HydraClientServices.EVENTS.fireCompileBlockRenderLayers(this);
+    }
+
+    /// Create and fire the relevant `CompileRenderState` event hook for this renderer
+    @Override
+    public void fireCompileRenderStateEvent(T animatable, @Nullable Void relatedObject, R renderState, float partialTick) {
+        HydraClientServices.EVENTS.fireCompileBlockRenderState(this, renderState, animatable);
+    }
+
+    /// Create and fire the relevant `Pre-Render` event hook for this renderer
+    ///
+    /// @return Whether the renderer should proceed based on the cancellation state of the event
+    @Override
+    public boolean firePreRenderEvent(RenderPassInfo<R> renderPassInfo, SubmitNodeCollector renderTasks) {
+        return HydraClientServices.EVENTS.fireBlockPreRender(renderPassInfo, renderTasks);
+    }
+
+    /// @deprecated Unusable because of vanilla implementation. Use [#createRenderState()]
+    @SuppressWarnings("unchecked")
+    @Deprecated
+    @ApiStatus.Internal
+    @Override
+    public final R createRenderState(T animatable, @Nullable Void relatedObject) {
+        return (R)new BlockEntityRenderState();
+    }
+    //</editor-fold>
+}

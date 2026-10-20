@@ -1,0 +1,80 @@
+package com.github.syren_dev_tech.hydra.service;
+
+import com.github.syren_dev_tech.hydra.animatable.GeoAnimatable;
+import com.github.syren_dev_tech.hydra.animatable.GeoItem;
+import com.github.syren_dev_tech.hydra.event.GeoRenderEvent;
+import com.github.syren_dev_tech.hydra.renderer.*;
+import com.github.syren_dev_tech.hydra.renderer.base.GeoRenderState;
+import com.github.syren_dev_tech.hydra.renderer.base.RenderPassInfo;
+import net.minecraft.client.renderer.SubmitNodeCollector;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.client.renderer.entity.state.EntityRenderState;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import org.jetbrains.annotations.ApiStatus;
+import org.jspecify.annotations.Nullable;
+
+/// Loader-agnostic service interface for Hydra's various events
+@ApiStatus.Internal
+public interface HydraEvents {
+    /// Fire the [GeoRenderEvent.Block.CompileRenderLayers] event
+    <T extends BlockEntity & GeoAnimatable, R extends BlockEntityRenderState>
+    void fireCompileBlockRenderLayers(GeoBlockRenderer<T, R> renderer);
+    /// Fire the [GeoRenderEvent.Block.CompileRenderState] event
+    <T extends BlockEntity & GeoAnimatable, R extends BlockEntityRenderState>
+    void fireCompileBlockRenderState(GeoBlockRenderer<T, R> renderer, R renderState, T animatable);
+    /// Fire the [GeoRenderEvent.Block.Pre] event, returning true if the event was not cancelled
+    <T extends BlockEntity & GeoAnimatable, R extends BlockEntityRenderState>
+    boolean fireBlockPreRender(RenderPassInfo<R> renderPassInfo, SubmitNodeCollector renderTasks);
+
+    /// Fire the [GeoRenderEvent.Armor.CompileRenderLayers] event
+    <T extends Item & GeoItem, R extends HumanoidRenderState>
+    void fireCompileArmorRenderLayers(GeoArmorRenderer<T, R> renderer);
+    /// Fire the [GeoRenderEvent.Armor.CompileRenderState] event
+    <T extends Item & GeoItem, O extends GeoArmorRenderer.RenderData, R extends HumanoidRenderState>
+    void fireCompileArmorRenderState(GeoArmorRenderer<T, R> renderer, R renderState, T animatable, O renderData);
+    /// Fire the [GeoRenderEvent.Armor.Pre] event, returning true if the event was not cancelled
+    <T extends Item & GeoItem, R extends HumanoidRenderState>
+    boolean fireArmorPreRender(RenderPassInfo<R> renderPassInfo, SubmitNodeCollector renderTasks);
+
+    /// Fire the [GeoRenderEvent.Entity.CompileRenderLayers] event
+    <T extends Entity & GeoAnimatable, R extends EntityRenderState>
+    void fireCompileEntityRenderLayers(GeoEntityRenderer<T, R> renderer);
+    /// Fire the [GeoRenderEvent.Entity.CompileRenderState] event
+    <T extends Entity & GeoAnimatable, R extends EntityRenderState>
+    void fireCompileEntityRenderState(GeoEntityRenderer<T, R> renderer, R renderState, T animatable);
+    /// Fire the [GeoRenderEvent.Entity.Pre] event, returning true if the event was not cancelled
+    <T extends Entity & GeoAnimatable, R extends EntityRenderState>
+    boolean fireEntityPreRender(RenderPassInfo<R> renderPassInfo, SubmitNodeCollector renderTasks);
+
+    /// Fire the [GeoRenderEvent.ReplacedEntity.CompileRenderLayers] event
+    <T extends GeoAnimatable, E extends Entity, R extends EntityRenderState>
+    void fireCompileReplacedEntityRenderLayers(GeoReplacedEntityRenderer<T, E, R> renderer);
+    /// Fire the [GeoRenderEvent.ReplacedEntity.CompileRenderState] event
+    <T extends GeoAnimatable, E extends Entity, R extends EntityRenderState>
+    void fireCompileReplacedEntityRenderState(GeoReplacedEntityRenderer<T, E, R> renderer, R renderState, T animatable, E entity);
+    /// Fire the [GeoRenderEvent.ReplacedEntity.Pre] event, returning true if the event was not cancelled
+    <T extends GeoAnimatable, E extends Entity, R extends EntityRenderState>
+    boolean fireReplacedEntityPreRender(RenderPassInfo<R> renderPassInfo, SubmitNodeCollector renderTasks);
+
+    /// Fire the [GeoRenderEvent.Item.CompileRenderLayers] event
+    <T extends Item & GeoAnimatable> void fireCompileItemRenderLayers(GeoItemRenderer<T> renderer);
+    /// Fire the [GeoRenderEvent.Item.CompileRenderState] event
+    <T extends Item & GeoAnimatable, O extends GeoItemRenderer.RenderData, R extends GeoRenderState>
+    void fireCompileItemRenderState(GeoItemRenderer<T> renderer, R renderState, T animatable, O renderData);
+    /// Fire the [GeoRenderEvent.Item.Pre] event, returning true if the event was not cancelled
+    <T extends Item & GeoAnimatable>
+    boolean fireItemPreRender(RenderPassInfo<GeoRenderState> renderPassInfo, SubmitNodeCollector renderTasks);
+
+    /// Fire the [GeoRenderEvent.Object.CompileRenderLayers] event
+    <T extends GeoAnimatable, E, R extends GeoRenderState>
+    void fireCompileObjectRenderLayers(GeoObjectRenderer<T, E, R> renderer);
+    /// Fire the [GeoRenderEvent.Object.CompileRenderState] event
+    <T extends GeoAnimatable, E, R extends GeoRenderState>
+    void fireCompileObjectRenderState(GeoObjectRenderer<T, E, R> renderer, R renderState, T animatable, @Nullable E relatedObject);
+    /// Fire the [GeoRenderEvent.Object.Pre] event, returning true if the event was not cancelled
+    <T extends GeoAnimatable, E, R extends GeoRenderState>
+    boolean fireObjectPreRender(RenderPassInfo<R> renderPassInfo, SubmitNodeCollector renderTasks);
+}

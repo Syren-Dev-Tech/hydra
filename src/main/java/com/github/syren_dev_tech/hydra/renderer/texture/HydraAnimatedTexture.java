@@ -1,0 +1,304 @@
+package com.github.syren_dev_tech.hydra.renderer.texture;
+
+import com.github.syren_dev_tech.hydra.HydraConstants;
+import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.device.GpuDevice;
+import com.mojang.renderpearl.api.textures.AddressMode;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.minecraft.client.renderer.texture.*;
+import net.minecraft.client.resources.metadata.animation.AnimationFrame;
+import net.minecraft.client.resources.metadata.animation.AnimationMetadataSection;
+import net.minecraft.client.resources.metadata.animation.FrameSize;
+import net.minecraft.client.resources.metadata.texture.TextureMetadataSection;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.util.ARGB;
+import org.jspecify.annotations.Nullable;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.IntStream;
+
+/// Animated texture handler for Hydra animated textures.
+///
+/// Uses the vanilla [animated texture schema][AnimationMetadataSection], but extrapolates it for non-atlas textures
+///
+/// **<u>NOTE:</u>** Initially, Hydra wraps all texture retrievals in this, to check for animation meta. If it [exists][#isAnimated()], this instance is kept,
+/// otherwise, a new instance of [SimpleTexture] is returned to preserve expected runtime operation for things like Iris.
+public class HydraAnimatedTexture extends SimpleTexture implements TickableTexture {
+    protected @Nullable AnimationInfo animatedTexture = null;
+    protected int frameWidth;
+    protected int frameHeight;
+    protected @Nullable NativeImage baseImage;
+
+    public HydraAnimatedTexture(Identifier location) {
+        super(location);
+    }
+
+    /// If Hydra found and constructed a valid animated texture schema.
+    ///
+    /// Returning false from here makes this no different from a standard [SimpleTexture], and an instance of that should be used instead
+    public boolean isAnimated() {
+        return this.animatedTexture != null;
+    }
+
+    @Override
+    public TextureContents loadContents(ResourceManager resourceManager) throws IOException {
+        Resource resource = resourceManager.getResourceOrThrow(resourceId());
+
+        try (InputStream stream = resource.open()) {
+            if (this.baseImage != null)
+                this.baseImage.close();
+
+            this.baseImage = NativeImage.read(stream);
+        }
+
+        if (this.animatedTexture != null)
+            this.animatedTexture.close();
+
+        this.animatedTexture = resource.metadata().getSection(AnimationMetadataSection.TYPE).map(this::buildAnimatedTexture).orElse(null);
+
+        return new TextureContents(this.baseImage, resource.metadata().getSection(TextureMetadataSection.TYPE).orElse(null));
+    }
+
+    @Override
+    public void apply(TextureContents textureContents) {
+        if (this.baseImage != null) {
+            AddressMode address = textureContents.clamp() ? AddressMode.CLAMP_TO_EDGE : AddressMode.REPEAT;
+            FilterMode filter = textureContents.blur() ? FilterMode.LINEAR : FilterMode.NEAREST;
+            this.sampler = RenderSystem.getSamplerCache().getSampler(address, address, filter, filter, false);
+
+            doLoad(this.baseImage);
+        }
+    }
+
+    @Override
+    public void doLoad(NativeImage image) {
+        GpuDevice gpuDevice = RenderSystem.getDevice();
+        Identifier textureId = resourceId();
+
+        Objects.requireNonNull(textureId);
+
+        this.texture = gpuDevice.createTexture(textureId::toString, 5, GpuFormat.RGBA8_UNORM, this.frameWidth, this.frameHeight, 1, 1);
+        this.textureView = gpuDevice.createTextureView(this.texture);
+
+        uploadFrame(gpuDevice, image, 0, 0, this.texture);
+    }
+
+    /// Compile the AnimatedTexture information for this texture instance
+    ///
+    /// Mostly used for interpolation handling and tick-frame advancement
+    protected HydraAnimatedTexture.@Nullable AnimationInfo buildAnimatedTexture(AnimationMetadataSection animMeta) {
+        if (this.baseImage == null)
+            return null;
+
+        final FrameSize frameSize = animMeta.calculateFrameSize(this.baseImage.getWidth(), this.baseImage.getHeight());
+        this.frameWidth = frameSize.width();
+        this.frameHeight = frameSize.height();
+        final int frameColumns = this.baseImage.getWidth() / this.frameWidth;
+        final int frameRows = this.baseImage.getHeight() / this.frameHeight;
+        final int frames = frameColumns * frameRows;
+        final int defaultFrameTime = animMeta.defaultFrameTime();
+        final int frameCount = animMeta.frames().map(List::size).orElse(frames);
+
+        if (frameCount <= 1)
+            return null;
+
+        final List<FrameInfo> frameList = new ObjectArrayList<>(frameCount);
+
+        if (animMeta.frames().isEmpty()) {
+            for (int i = 0; i < frames; i++) {
+                frameList.add(new FrameInfo(i, defaultFrameTime));
+            }
+        }
+        else {
+            for (AnimationFrame frame : animMeta.frames().get()) {
+                frameList.add(new FrameInfo(frame.index(), frame.timeOr(defaultFrameTime)));
+            }
+
+            int frameIndex = 0;
+            IntSet validFrames = new IntOpenHashSet();
+
+            for (Iterator<FrameInfo> iterator = frameList.iterator(); iterator.hasNext(); frameIndex++) {
+                FrameInfo frameInfo = iterator.next();
+                boolean validFrame = true;
+
+                if (frameInfo.time <= 0) {
+                    HydraConstants.LOGGER.warn("Invalid frame duration on sprite {} frame {}: {}", resourceId(), frameIndex, frameInfo.time);
+                    validFrame = false;
+                }
+
+                if (frameInfo.index < 0 || frameInfo.index >= frames) {
+                    HydraConstants.LOGGER.warn("Invalid frame index on sprite {} frame {}: {}", resourceId(), frameIndex, frameInfo.index);
+                    validFrame = false;
+                }
+
+                if (validFrame) {
+                    validFrames.add(frameInfo.index);
+                }
+                else {
+                    iterator.remove();
+                }
+            }
+
+            int[] unusedFrames = IntStream.range(0, frames).filter(frame -> !validFrames.contains(frame)).toArray();
+
+            if (unusedFrames.length > 0)
+                HydraConstants.LOGGER.warn("Unused frames in sprite {}: {}", resourceId(), Arrays.toString(unusedFrames));
+        }
+
+        return new AnimationInfo(List.copyOf(frameList), frameColumns, animMeta.interpolatedFrames());
+    }
+
+    /// Upload the given [NativeImage] to the in-memory texture buffer, with an optional offset for non-interpolated frames
+    protected void uploadFrame(GpuDevice gpuDevice, NativeImage image, int x, int y, GpuTexture gpuTexture) {
+        gpuDevice.createCommandEncoder().writeToTexture(gpuTexture, image.getPixelBytes(), 0, 0, x, y, this.frameWidth, this.frameHeight);
+    }
+
+    /// Called by [TextureManager] every tick to allow the texture to update itself as necessary.
+    ///
+    /// This effectively caps "real" frames at 20fps, but interpolation allows us to fudge this a little.
+    @Override
+    public void tick() {
+        if (this.animatedTexture != null)
+            this.animatedTexture.tick();
+    }
+
+    @Override
+    public void close() {
+        if (this.baseImage != null) {
+            this.baseImage.close();
+            this.baseImage = null;
+        }
+
+        if (this.animatedTexture != null) {
+            this.animatedTexture.close();
+            this.animatedTexture = null;
+        }
+
+        super.close();
+    }
+
+    /// Container class for the animation information for this texture instance
+    ///
+    /// Functionally somewhat of a clone of [SpriteContents.AnimationState], but extrapolated to be extensible and manageable
+    protected class AnimationInfo implements AutoCloseable {
+        protected final List<FrameInfo> frames;
+        protected final int frameRowSize;
+        protected final boolean interpolateFrames;
+
+        protected final @Nullable InterpolationData interpolationData;
+        protected final NativeImage currentFrameBuffer;
+        int currentFrame;
+        int subFrame;
+
+        public AnimationInfo(List<FrameInfo> frames, int frameRowSize, boolean interpolateFrames) {
+            this.frames = frames;
+            this.frameRowSize = frameRowSize;
+            this.interpolateFrames = interpolateFrames;
+            this.interpolationData = this.interpolateFrames ? new InterpolationData(HydraAnimatedTexture.this.frameWidth, HydraAnimatedTexture.this.frameHeight) : null;
+            this.currentFrameBuffer = new NativeImage(HydraAnimatedTexture.this.frameWidth, HydraAnimatedTexture.this.frameHeight, false);
+        }
+
+        int getFrameColumn(int frameIndex) {
+            return frameIndex % this.frameRowSize;
+        }
+
+        int getFrameRow(int frameIndex) {
+            return frameIndex / this.frameRowSize;
+        }
+
+        public void tick() {
+            if (HydraAnimatedTexture.this.baseImage == null)
+                return;
+
+            this.subFrame++;
+            FrameInfo prevFrameInfo = this.frames.get(this.currentFrame);
+
+            if (this.subFrame >= prevFrameInfo.time) {
+                this.currentFrame = (this.currentFrame + 1) % this.frames.size();
+                this.subFrame = 0;
+                int frameIndex = this.frames.get(this.currentFrame).index;
+
+                if (prevFrameInfo.index != frameIndex) {
+                    HydraAnimatedTexture instance = HydraAnimatedTexture.this;
+                    int frameX = getFrameColumn(frameIndex) * instance.frameWidth;
+                    int frameY = getFrameRow(frameIndex) * instance.frameHeight;
+
+                    instance.baseImage.copyRect(this.currentFrameBuffer, frameX, frameY, 0, 0, instance.frameWidth, instance.frameHeight, false, false);
+
+                    uploadFrame(RenderSystem.getDevice(), this.currentFrameBuffer, 0, 0, getTexture());
+                }
+            }
+            else if (this.interpolationData != null) {
+                this.interpolationData.tickAndUpload(HydraAnimatedTexture.this.baseImage, getTexture());
+            }
+        }
+
+        @Override
+        public void close() {
+            if (this.interpolationData != null)
+                this.interpolationData.close();
+        }
+
+        /// Handler class for interpolated frame generation and injection
+        ///
+        /// This class is only instantiated if the [AnimationMetadataSection] enables [interpolation][AnimationMetadataSection#interpolatedFrames()]
+        protected class InterpolationData implements AutoCloseable {
+            protected final NativeImage buffer;
+
+            public InterpolationData(int frameWidth, int frameHeight) {
+                this.buffer = new NativeImage(frameWidth, frameHeight, false);
+            }
+
+            /// Check and upload a newly created, interpolated frame, as necessary
+            protected void tickAndUpload(NativeImage image, GpuTexture gpuTexture) {
+                AnimationInfo instance = AnimationInfo.this;
+                List<FrameInfo> frames = instance.frames;
+                FrameInfo currentFrameInfo = frames.get(instance.currentFrame);
+                int nextFrameIndex = frames.get((instance.currentFrame + 1) % frames.size()).index;
+
+                if (currentFrameInfo.index != nextFrameIndex) {
+                    float partialFrame = instance.subFrame / (float)currentFrameInfo.time;
+                    int frameHeight = HydraAnimatedTexture.this.frameHeight;
+                    int frameWidth = HydraAnimatedTexture.this.frameWidth;
+
+                    for (int pixelY = 0; pixelY < frameHeight; pixelY++) {
+                        for (int pixelX = 0; pixelX < frameWidth; pixelX++) {
+                            int framePixel = getPixel(image, instance, currentFrameInfo.index, pixelX, pixelY, frameWidth, frameHeight);
+                            int nextFramePixel = getPixel(image, instance, nextFrameIndex, pixelX, pixelY, frameWidth, frameHeight);
+
+                            this.buffer.setPixel(pixelX, pixelY, ARGB.linearLerp(partialFrame, framePixel, nextFramePixel));
+                        }
+                    }
+
+                    HydraAnimatedTexture.this.uploadFrame(RenderSystem.getDevice(), this.buffer, 0, 0, gpuTexture);
+                }
+            }
+
+            /// Get the frame-relative pixel for the given input coordinates and frame index from the root texture
+            protected int getPixel(NativeImage image, AnimationInfo animationInfo, int frameIndex, int x, int y, int frameWidth, int frameHeight) {
+                return image.getPixel(x + animationInfo.getFrameColumn(frameIndex) * frameWidth, y + animationInfo.getFrameRow(frameIndex) * frameHeight);
+            }
+
+            @Override
+            public void close() {
+                this.buffer.close();
+            }
+        }
+    }
+
+    /// Container class for holding a single animation frame's data
+    protected record FrameInfo(int index, int time) {}
+}
