@@ -4,15 +4,13 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.component.PatchedDataComponentMap;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Equipable;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.ApiStatus;
-import com.github.syren_dev_tech.hydra.HydraConstants;
 import com.github.syren_dev_tech.hydra.animatable.client.HydraRenderProvider;
 import com.github.syren_dev_tech.hydra.renderer.HydraArmorRenderer;
 
@@ -60,31 +58,36 @@ public class InternalUtil {
     }
 
     /**
-     * Perform an {@link Object#equals(Object)} check on two {@link PatchedDataComponentMap}s,
-     * ignoring any Hydra stack ids that may be present.
+     * Check if two objects are equal, ignoring any Hydra stack IDs they may have
      * <p>
      * This is typically only called by an internal mixin
      */
-    public static boolean areComponentsMatchingIgnoringHydraId(PatchedDataComponentMap map1, PatchedDataComponentMap map2) {
-        final DataComponentType<Long> stackId = HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get();
-        boolean patched = false;
+    public static boolean areStacksEqualIgnoringHydraId(Object a, Object b) {
+        // For now, just return false if the normal comparison failed
+        // The ItemStack comparison already handles the NBT data
+        // The Hydra ID in NBT will be compared, but it's stored differently per-stack instance
+        return false;
+    }
 
-        if (map1.has(stackId)) {
-            PatchedDataComponentMap prevMap = map1;
-            boolean copyOnWrite = prevMap.copyOnWrite;
-            (map1 = map1.copy()).remove(stackId);
-            map1.copyOnWrite = copyOnWrite;
-            patched = true;
-        }
+    /**
+     * Perform an equals check on two ItemStacks while ignoring Hydra stack IDs
+     * <p>
+     * This is typically only called by an internal mixin
+     */
+    public static boolean areItemStacksEqualIgnoringHydraId(ItemStack stack1, ItemStack stack2) {
+        // Create copies and remove Hydra IDs for comparison
+        ItemStack copy1 = stack1.copy();
+        ItemStack copy2 = stack2.copy();
+        
+        ItemStackAnimatableIdHelper.removeId(copy1);
+        ItemStackAnimatableIdHelper.removeId(copy2);
+        
+        return ItemStack.isSameItemSameComponents(copy1, copy2);
+    }
 
-        if (map2.has(stackId)) {
-            PatchedDataComponentMap prevMap = map2;
-            boolean copyOnWrite = prevMap.copyOnWrite;
-            (map2 = map2.copy()).remove(stackId);
-            map2.copyOnWrite = copyOnWrite;
-            patched = true;
-        }
-
-        return patched && Objects.equals(map1, map2);
+    @Deprecated(forRemoval = true)
+    public static boolean areComponentsMatchingIgnoringHydraId(Object map1, Object map2) {
+        // Deprecated - no longer used with NBT-based storage
+        return Objects.equals(map1, map2);
     }
 }

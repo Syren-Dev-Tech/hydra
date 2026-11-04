@@ -37,12 +37,15 @@ import java.util.regex.Pattern;
 /**
  * Mathematical expression parser that breaks down String-expressions into tokenised objects that can be used for automated computation.
  * <p>
- * Original design: <a href="https://github.com/fadookie/particleman/tree/be1ce93c3cbd0f894742e3f41c0c6b23880be046/mclib">McLib - McHorse, Eliot Lash, Hiroku</a>
- * under <a href="https://github.com/fadookie/particleman/blob/be1ce93c3cbd0f894742e3f41c0c6b23880be046/LICENSE-mclib.md">MIT License</a>
+ * Original design: <a href="https://github.com/fadookie/particleman/tree/be1ce93c3cbd0f894742e3f41c0c6b23880be046/mclib">McLib - McHorse, Eliot Lash, Hiroku</a> under <a href="https://github.com/fadookie/particleman/blob/be1ce93c3cbd0f894742e3f41c0c6b23880be046/LICENSE-mclib.md">MIT License</a>
  * <p>
  * Overhauled by Tslat for Hydra and redesigned specifically for <a href="https://learn.microsoft.com/en-us/minecraft/creator/reference/content/molangreference/examples/molangconcepts/molangintroduction?view=minecraft-bedrock-stable">Molang</a> use
  */
 public class MathParser {
+    private MathParser() {
+        /* This utility class should not be instantiated */
+    }
+
     private static final Pattern EXPRESSION_FORMAT = Pattern.compile("^[\\w\\s_+-/*%^&|<>=!?:;.,(){}]+$");
     private static final Pattern WHITESPACE = Pattern.compile("\\s");
     private static final Pattern NUMERIC = Pattern.compile("^-?(\\d+(\\.\\d+)?|\\.\\d+)$");
@@ -118,11 +121,9 @@ public class MathParser {
             return null;
 
         try {
-            return (T)FUNCTION_FACTORIES.get(name).createAndValidate(values);
-        }
-        catch (IllegalArgumentException ex) {
-            throw new CompoundException("Invalid math function arguments provided in Molang expression '" + name + "'")
-                    .withMessage(ex.getMessage());
+            return (T) FUNCTION_FACTORIES.get(name).createAndValidate(values);
+        } catch (IllegalArgumentException ex) {
+            throw new CompoundException("Invalid math function arguments provided in Molang expression '" + name + "'").withMessage(ex.getMessage());
         }
     }
 
@@ -187,18 +188,14 @@ public class MathParser {
         if (!EXPRESSION_FORMAT.matcher(expression).matches())
             throw new CompoundException("Invalid characters found in expression: '" + expression + "'");
 
-        expression = WHITESPACE
-                .matcher(expression)
-                .replaceAll("")
-                .toLowerCase(Locale.ROOT);
+        expression = WHITESPACE.matcher(expression).replaceAll("").toLowerCase(Locale.ROOT);
 
         if (expression.startsWith(MOLANG_RETURN)) {
             expression = expression.substring(MOLANG_RETURN.length());
 
             if (expression.contains(STATEMENT_DELIMITER))
                 expression = expression.substring(0, expression.indexOf(STATEMENT_DELIMITER));
-        }
-        else if (expression.contains(STATEMENT_DELIMITER)) {
+        } else if (expression.contains(STATEMENT_DELIMITER)) {
             final String[] subExpressions = expression.split(STATEMENT_DELIMITER);
             final List<MathValue> subValues = new ObjectArrayList<>(subExpressions.length);
 
@@ -232,8 +229,7 @@ public class MathParser {
     public static MathValue compileExpression(String expression) {
         try {
             return parseSymbols(compileSymbols(decomposeExpression(expression)));
-        }
-        catch (CompoundException ex) {
+        } catch (CompoundException ex) {
             throw ex.withMessage("Failed to parse expression '" + expression + "'");
         }
     }
@@ -252,24 +248,24 @@ public class MathParser {
                 case ')' -> groupState--;
                 case '{' -> curlyBraceState++;
                 case '}' -> curlyBraceState--;
-                default -> {}
+                default -> {
+                }
             }
 
 
             if (character == '(') {
                 groupState++;
-            }
-            else if (character == ')') {
+            } else if (character == ')') {
                 groupState--;
             }
-            
+
             if (groupState < 0)
                 throw new CompoundException("Closing parenthesis before opening parenthesis in expression '" + expression + "'");
 
             if (curlyBraceState < 0)
                 throw new CompoundException("Closing curly brace before opening curly brace in expression '" + expression + "'");
         }
-        
+
         if (groupState != 0)
             throw new CompoundException("Uneven parenthesis in expression, each opening brace must have a pairing close brace '" + expression + "'");
 
@@ -310,13 +306,13 @@ public class MathParser {
      * Compile a collection of 'symbols' from the given char array representing the expression split into individual characters
      *
      * @return A list of either string symbols, or a group of pre-compiled arguments of a grouping
-     * <p>
-     * This list is formatted such that each entry is either:
-     * <ul>
-     *     <li>A self-contained value or expression</li>
-     *     <li>A pre-compiled {@link MathValue} representing an expression group</li>
-     *     <li>A {@link MathFunction} name immediately followed by a pre-compiled {@link MathValue} argument group</li>
-     * </ul>
+     *         <p>
+     *         This list is formatted such that each entry is either:
+     *         <ul>
+     *         <li>A self-contained value or expression</li>
+     *         <li>A pre-compiled {@link MathValue} representing an expression group</li>
+     *         <li>A {@link MathFunction} name immediately followed by a pre-compiled {@link MathValue} argument group</li>
+     *         </ul>
      */
     public static List<Either<String, List<MathValue>>> compileSymbols(char[] chars) {
         final List<Either<String, List<MathValue>>> symbols = new ObjectArrayList<>();
@@ -344,8 +340,7 @@ public class MathParser {
 
                 symbols.add(Either.left(operator));
                 buffer.setLength(0);
-            }
-            else if (ch == '(') {
+            } else if (ch == '(') {
                 if (!buffer.isEmpty()) {
                     symbols.add(Either.left(buffer.toString()));
                     buffer.setLength(0);
@@ -359,11 +354,9 @@ public class MathParser {
 
                     if (groupChar == '(') {
                         groupState++;
-                    }
-                    else if (groupChar == ')') {
+                    } else if (groupChar == ')') {
                         groupState--;
-                    }
-                    else if (groupChar == ',' && groupState == 1) {
+                    } else if (groupChar == ',' && groupState == 1) {
                         subValues.add(parseSymbols(compileSymbols(buffer.toString().toCharArray())));
                         buffer.setLength(0);
 
@@ -372,12 +365,10 @@ public class MathParser {
 
                     if (groupState == 0) {
                         if (!buffer.isEmpty()) {
-                            if (!symbols.isEmpty() && symbols.getLast().left().filter("-"::equals).isPresent() &&
-                                (symbols.size() == 1 || symbols.get(symbols.size() - 2).left().filter(Operator::isOperator).isPresent())) {
+                            if (!symbols.isEmpty() && symbols.getLast().left().filter("-"::equals).isPresent() && (symbols.size() == 1 || symbols.get(symbols.size() - 2).left().filter(Operator::isOperator).isPresent())) {
                                 symbols.removeLast();
                                 subValues.add(new Negative(parseSymbols(compileSymbols(buffer.toString().toCharArray()))));
-                            }
-                            else {
+                            } else {
                                 subValues.add(parseSymbols(compileSymbols(buffer.toString().toCharArray())));
                             }
                         }
@@ -388,13 +379,11 @@ public class MathParser {
                         buffer.setLength(0);
 
                         break;
-                    }
-                    else {
+                    } else {
                         buffer.append(groupChar);
                     }
                 }
-            }
-            else {
+            } else {
                 buffer.append(ch);
             }
         }
@@ -519,7 +508,7 @@ public class MathParser {
      * @throws CompoundException If there is a parsing failure for any of the contents of the symbols
      */
     @Nullable
-    protected static MathValue compileCalculation(List<Either<String, List<MathValue>>> symbols) throws CompoundException  {
+    protected static MathValue compileCalculation(List<Either<String, List<MathValue>>> symbols) throws CompoundException {
         if (symbols.size() < 3)
             return null;
 
@@ -529,9 +518,7 @@ public class MathParser {
         int lastOperatorIndex = -1;
 
         for (int i = 0; i < symbolCount; i++) {
-            final Operator operator = symbols.get(i).left()
-                    .filter(Operator::isOperator)
-                    .map(MathParser::getOperatorFor).orElse(null);
+            final Operator operator = symbols.get(i).left().filter(Operator::isOperator).map(MathParser::getOperatorFor).orElse(null);
 
             if (operator == null)
                 continue;
@@ -573,8 +560,7 @@ public class MathParser {
             operators.remove(highestOperatorIndex);
             components.remove(highestOperatorIndex + 1);
             components.remove(highestOperatorIndex + 1);
-        }
-        while (true);
+        } while (true);
 
         if (components.size() != 1)
             throw new CompoundException("Invalidly formatted expression: " + symbols);
@@ -589,7 +575,7 @@ public class MathParser {
      * @throws CompoundException If there is a parsing failure for any of the contents of the symbols
      */
     @Nullable
-    protected static Ternary compileTernary(List<Either<String, List<MathValue>>> symbols) throws CompoundException  {
+    protected static Ternary compileTernary(List<Either<String, List<MathValue>>> symbols) throws CompoundException {
         final int symbolCount = symbols.size();
 
         if (symbolCount < 3)
@@ -612,8 +598,7 @@ public class MathParser {
                 }
 
                 ternaryState++;
-            }
-            else if (":".equals(string)) {
+            } else if (":".equals(string)) {
                 if (ternaryState == 1 && ifTrue == null && queryIndex > 0) {
                     final int queryIndex2 = queryIndex;
                     ifTrue = () -> parseSymbols(symbols.subList(queryIndex2, i2));
@@ -708,6 +693,7 @@ public class MathParser {
      * Determine if the given string is likely to be a variable/function of some kind.
      * <p>
      * Functionally this is just a confirmation-by-elimination check, since names don't really have a defined form
+     * 
      * @deprecated This is no longer used and isn't really a reliable check, try {@link #isFunctionRegistered(String)} or {@link #isLikelyVariable(String)}
      */
     @Deprecated(forRemoval = true)

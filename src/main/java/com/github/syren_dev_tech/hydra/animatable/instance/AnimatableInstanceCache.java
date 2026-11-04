@@ -2,7 +2,6 @@ package com.github.syren_dev_tech.hydra.animatable.instance;
 
 import com.google.common.base.Suppliers;
 import org.apache.commons.lang3.mutable.MutableObject;
-import com.github.syren_dev_tech.hydra.HydraServices;
 import com.github.syren_dev_tech.hydra.animatable.HydraAnimatable;
 import com.github.syren_dev_tech.hydra.animatable.SingletonHydraAnimatable;
 import com.github.syren_dev_tech.hydra.animatable.client.HydraRenderProvider;
@@ -23,7 +22,7 @@ public abstract class AnimatableInstanceCache {
 	public AnimatableInstanceCache(HydraAnimatable animatable) {
 		this.animatable = animatable;
 		this.renderProvider = Suppliers.memoize(() -> {
-			if (!(this.animatable instanceof SingletonHydraAnimatable singleton) || !HydraServices.PLATFORM.isPhysicalClient())
+			if (!(this.animatable instanceof SingletonHydraAnimatable singleton))
 				return null;
 
 			final MutableObject<HydraRenderProvider> consumer = new MutableObject<>(HydraRenderProvider.DEFAULT);

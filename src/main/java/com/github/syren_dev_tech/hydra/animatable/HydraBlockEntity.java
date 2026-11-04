@@ -1,12 +1,10 @@
 package com.github.syren_dev_tech.hydra.animatable;
 
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 import com.github.syren_dev_tech.hydra.HydraConstants;
-import com.github.syren_dev_tech.hydra.HydraServices;
 import com.github.syren_dev_tech.hydra.animation.AnimatableManager;
 import com.github.syren_dev_tech.hydra.animation.AnimationController;
 import com.github.syren_dev_tech.hydra.constant.dataticket.SerializableDataTicket;
@@ -53,12 +51,8 @@ public interface HydraBlockEntity extends HydraAnimatable {
 			return;
 		}
 
-		if (level.isClientSide()) {
-			getAnimatableInstanceCache().getManagerForId(0).setData(dataTicket, data);
-		}
-		else {
-			HydraServices.NETWORK.syncBlockEntityAnimData(blockEntity.getBlockPos(), dataTicket, data, (ServerLevel)level);
-		}
+		// Client-side only
+		getAnimatableInstanceCache().getManagerForId(0).setData(dataTicket, data);
 	}
 
 	/**
@@ -82,16 +76,12 @@ public interface HydraBlockEntity extends HydraAnimatable {
 			return;
 		}
 
-		if (level.isClientSide()) {
-			if (controllerName != null) {
-				getAnimatableInstanceCache().getManagerForId(0).tryTriggerAnimation(controllerName, animName);
-			}
-			else {
-				getAnimatableInstanceCache().getManagerForId(0).tryTriggerAnimation(animName);
-			}
+		// Client-side only
+		if (controllerName != null) {
+			getAnimatableInstanceCache().getManagerForId(0).tryTriggerAnimation(controllerName, animName);
 		}
 		else {
-			HydraServices.NETWORK.triggerBlockEntityAnim(blockEntity.getBlockPos(), controllerName, animName, (ServerLevel)level);
+			getAnimatableInstanceCache().getManagerForId(0).tryTriggerAnimation(animName);
 		}
 	}
 
@@ -116,18 +106,14 @@ public interface HydraBlockEntity extends HydraAnimatable {
 			return;
 		}
 
-		if (level.isClientSide()) {
-			AnimatableManager<HydraAnimatable> animatableManager = getAnimatableInstanceCache().getManagerForId(0);
+		// Client-side only
+		AnimatableManager<HydraAnimatable> animatableManager = getAnimatableInstanceCache().getManagerForId(0);
 
-			if (controllerName != null) {
-				animatableManager.stopTriggeredAnimation(controllerName, animName);
-			}
-			else {
-				animatableManager.stopTriggeredAnimation(animName);
-			}
+		if (controllerName != null) {
+			animatableManager.stopTriggeredAnimation(controllerName, animName);
 		}
 		else {
-			HydraServices.NETWORK.stopTriggeredBlockEntityAnim(blockEntity.getBlockPos(), (ServerLevel)level, controllerName, animName);
+			animatableManager.stopTriggeredAnimation(animName);
 		}
 	}
 

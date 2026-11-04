@@ -1,0 +1,124 @@
+version: '3'
+
+tasks:
+  stop-daemon:
+    desc: Stop all running Gradle daemons
+    cmds:
+      - gradle --stop
+
+  clean:
+    desc: Run Gradle clean in the project
+    cmds:
+      - gradle clean
+
+  clear-build-cache:
+    desc: Delete Gradle local build-cache
+    cmds:
+      - rm -rf ~/.gradle/caches/build-cache-*
+
+  clear-transforms:
+    desc: Delete Gradle transform caches
+    cmds:
+      - rm -rf ~/.gradle/caches/transforms-*
+
+  clear-all-caches:
+    desc: Nuclear option - delete entire Gradle caches directory
+    deps:
+      - stop-daemon
+    cmds:
+      - rm -rf ~/.gradle/caches
+    status:
+      - test ! -d ~/.gradle/caches
+
+  refresh-deps:
+    desc: 'Force refresh Gradle dependencies without running full build'
+    cmds:
+      - gradle dependencies --refresh-dependencies
+
+  bump-version:
+    desc: Bump the mod_version in gradle.properties (patch, minor, or major)
+    vars:
+      TYPE: 'patch'
+    cmds:
+      - |
+        set -euo pipefail; \
+        version=$(grep -E '^[[:space:]]*mod_version[[:space:]]*=' gradle.properties | head -n1 | cut -d= -f2- | tr -d '[:space:]'); \
+        if [[ -z "$version" ]]; then \
+            echo "Error: mod_version not found in gradle.properties" >&2; \
+            exit 1; \
+        fi; \
+        IFS='.' read -r major minor patch <<< "$version"; \
+        case "{{.TYPE}}" in \
+            major) major=$((major + 1)); minor=0; patch=0 ;; \
+            minor) minor=$((minor + 1)); patch=0 ;; \
+            patch) patch=$((patch + 1)) ;; \
+            *) echo "Error: invalid type '{{.TYPE}}'. Use major, minor, or patch." >&2; exit 1 ;; \
+        esac; \
+        new_version="$major.$minor.$patch"; \
+        sed -i "s/^mod_version=.*/mod_version=$new_version/" gradle.properties; \
+        echo "Bumped mod_version from $version to $new_version"
+
+  release:
+    cmds:
+      - |
+        @set -euo pipefail; \
+        version="$$(grep -E '^[[:space:]]*mod_version[[:space:]]*=' gradle.properties | head -n1 | cut -d= -f2- | tr -d '[:space:]')"; \
+        if [[ -z "$$version" ]]; then \
+            echo "Error: mod_version not found in gradle.properties" >&2; \
+            exit 1; \
+        fi; \
+        tag="v$$version"; \
+        if git rev-parse "$$tag" >/dev/null 2>&1; then \
+            echo "Error: tag '$$tag' already exists" >&2; \
+            exit 1; \
+        fi; \
+        git tag "$$tag"; \
+        echo "Created git tag: $$tag"
+
+  publish-tag:
+    cmds:
+      - |
+        @set -euo pipefail; \
+        version="$$(grep -E '^[[:space:]]*mod_version[[:space:]]*=' gradle.properties | head -n1 | cut -d= -f2- | tr -d '[:space:]')"; \
+        if [[ -z "$$version" ]]; then \
+            echo "Error: mod_version not found in gradle.properties" >&2; \
+            exit 1; \
+        fi; \
+        tag="v$$version"; \
+        git fetch --tags "$(TAG_REMOTE)"; \
+        if [[ -n "$$(git ls-remote --tags "$(TAG_REMOTE)" "refs/tags/$$tag")" ]]; then \
+            echo "Error: tag '$$tag' already exists on remote '$(TAG_REMOTE)'" >&2; \
+            exit 1; \
+        fi; \
+        if ! git rev-parse "$$tag" >/dev/null 2>&1; then \
+            echo "Error: local tag '$$tag' does not exist. Run 'make release' first." >&2; \
+            exit 1; \
+        fi; \
+        git push "$(TAG_REMOTE)" "$$tag"; \
+        echo "Pushed git tag: $$tag to $(TAG_REMOTE)"
+
+  publish-remove:
+    vars:
+      LOADER: neoforge
+    cmds:
+      - gradle --no-daemon clean build -P{{.LOADER}}=true
+      - mkdir -p ./dist/{{.LOADER}}
+      - cp build/libs/*.jar ./dist/{{.LOADER}}/
+      - gradle --no-daemon publish -P{{.LOADER}}=true
+      - gradle --no-daemon publishToMavenLocal
+
+  publish-local:
+    vars:
+      LOADER: neoforge
+    cmds:
+      - |
+        gradle --no-daemon clean build -P{{.LOADER}}=true
+        mkdir -p ./dist/{{.LOADER}}
+        cp build/libs/*.jar ./dist/{{.LOADER}}/
+        gradle --no-daemon publishToMavenLocal
+    
+  resync:
+    cmds:
+      - gradle build
+      - task: bump-version
+      - task publish-local

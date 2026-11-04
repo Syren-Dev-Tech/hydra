@@ -7,6 +7,7 @@ import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.SkullModelBase;
 import net.minecraft.client.model.geom.ModelLayers;
 import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.geom.ModelPart.Cube;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
@@ -140,7 +141,7 @@ public class ItemArmorHydraLayer<T extends LivingEntity & HydraAnimatable> exten
             HumanoidModel<?> model = getModelForItem(bone, slot, armorStack, animatable);
             ModelPart modelPart = getModelPartForBone(bone, slot, armorStack, animatable, model);
 
-            if (!modelPart.cubes.isEmpty()) {
+            if (!modelPart.isEmpty()) {
                 poseStack.pushPose();
                 poseStack.scale(-1, -1, 1);
 
@@ -211,7 +212,7 @@ public class ItemArmorHydraLayer<T extends LivingEntity & HydraAnimatable> exten
     protected HumanoidModel<?> getModelForItem(HydraBone bone, EquipmentSlot slot, ItemStack stack, T animatable) {
         HumanoidModel<LivingEntity> defaultModel = slot == EquipmentSlot.LEGS ? INNER_ARMOR_MODEL : OUTER_ARMOR_MODEL;
 
-        return HydraServices.Client.ITEM_RENDERING.getArmorModelForItem(animatable, stack, slot, defaultModel);
+        return HydraServices.Client.getItemRendering().getArmorModelForItem(animatable, stack, slot, defaultModel);
     }
 
     /**
@@ -239,7 +240,7 @@ public class ItemArmorHydraLayer<T extends LivingEntity & HydraAnimatable> exten
      */
     protected void prepModelPartForRender(PoseStack poseStack, HydraBone bone, ModelPart sourcePart) {
         final HydraCube firstCube = bone.getCubes().isEmpty() ? null : bone.getCubes().getFirst();
-        final Cube armorCube = sourcePart.cubes.isEmpty() ? null : getReferenceCubeForModel(bone, sourcePart);
+        final Cube armorCube = sourcePart.isEmpty() ? null : getReferenceCubeForModel(bone, sourcePart);
         final double armorBoneSizeX = firstCube == null ? 1 : firstCube.size().x();
         final double armorBoneSizeY = firstCube == null ? 1 : firstCube.size().y();
         final double armorBoneSizeZ = firstCube == null ? 1 : firstCube.size().z();
@@ -265,6 +266,6 @@ public class ItemArmorHydraLayer<T extends LivingEntity & HydraAnimatable> exten
      * By default, this uses the <b><u>FIRST</u></b> cube in the source part to determine the scale and position of the HydraArmor to be rendered
      */
     protected Cube getReferenceCubeForModel(HydraBone bone, ModelPart sourcePart) {
-        return sourcePart.cubes.getFirst();
+        return RenderUtil.getFirstCubeFromModelPart(sourcePart);
     }
 }

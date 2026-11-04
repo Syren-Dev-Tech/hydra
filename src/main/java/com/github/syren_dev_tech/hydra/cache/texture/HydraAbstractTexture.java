@@ -11,7 +11,6 @@ import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.HydraServices;
 
 import java.io.File;
 import java.io.IOException;
@@ -56,7 +55,7 @@ public abstract class HydraAbstractTexture extends AbstractTexture {
 	 */
 	protected void printDebugImageToDisk(ResourceLocation id, NativeImage newImage) {
 		try {
-			File file = new File(HydraServices.PLATFORM.getGameDir().toFile(), "HydraTexture Debug Printouts");
+			File file = new File(Minecraft.getInstance().gameDirectory, "HydraTexture Debug Printouts");
 
 			if (!file.exists()) {
 				file.mkdirs();

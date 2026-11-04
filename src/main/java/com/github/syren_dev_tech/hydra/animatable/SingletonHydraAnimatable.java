@@ -3,7 +3,6 @@ package com.github.syren_dev_tech.hydra.animatable;
 import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.HydraServices;
 import com.github.syren_dev_tech.hydra.animatable.client.HydraRenderProvider;
 import com.github.syren_dev_tech.hydra.animatable.instance.AnimatableInstanceCache;
 import com.github.syren_dev_tech.hydra.animatable.instance.SingletonAnimatableInstanceCache;
@@ -60,12 +59,8 @@ public interface SingletonHydraAnimatable extends HydraAnimatable {
      */
     @ApiStatus.NonExtendable
     default <D> void setAnimData(Entity relatedEntity, long instanceId, SerializableDataTicket<D> dataTicket, D data) {
-        if (relatedEntity.level().isClientSide()) {
-            getAnimatableInstanceCache().getManagerForId(instanceId).setData(dataTicket, data);
-        }
-        else {
-            syncAnimData(instanceId, dataTicket, data, relatedEntity);
-        }
+        // Client-side only
+        getAnimatableInstanceCache().getManagerForId(instanceId).setData(dataTicket, data);
     }
 
     /**
@@ -81,7 +76,7 @@ public interface SingletonHydraAnimatable extends HydraAnimatable {
      */
     @ApiStatus.NonExtendable
     default <D> void syncAnimData(long instanceId, SerializableDataTicket<D> dataTicket, D data, Entity entityToTrack) {
-        HydraServices.NETWORK.syncSingletonAnimData(this, instanceId, dataTicket, data, entityToTrack);
+        // Client-side only (no networking)
     }
 
     /**
@@ -98,16 +93,12 @@ public interface SingletonHydraAnimatable extends HydraAnimatable {
      */
     @ApiStatus.NonExtendable
     default <D> void triggerAnim(Entity relatedEntity, long instanceId, @Nullable String controllerName, String animName) {
-        if (relatedEntity.level().isClientSide()) {
-            if (controllerName != null) {
-                getAnimatableInstanceCache().getManagerForId(instanceId).tryTriggerAnimation(controllerName, animName);
-            }
-            else {
-                getAnimatableInstanceCache().getManagerForId(instanceId).tryTriggerAnimation(animName);
-            }
+        // Client-side only
+        if (controllerName != null) {
+            getAnimatableInstanceCache().getManagerForId(instanceId).tryTriggerAnimation(controllerName, animName);
         }
         else {
-            HydraServices.NETWORK.triggerSingletonAnim(this, relatedEntity, instanceId, controllerName, animName);
+            getAnimatableInstanceCache().getManagerForId(instanceId).tryTriggerAnimation(animName);
         }
     }
 
@@ -125,21 +116,17 @@ public interface SingletonHydraAnimatable extends HydraAnimatable {
      */
     @ApiStatus.NonExtendable
     default void stopTriggeredAnim(Entity relatedEntity, long instanceId, @Nullable String controllerName, @Nullable String animName) {
-        if (relatedEntity.level().isClientSide()) {
-            AnimatableManager<HydraAnimatable> animatableManager = getAnimatableInstanceCache().getManagerForId(instanceId);
+        // Client-side only
+        AnimatableManager<HydraAnimatable> animatableManager = getAnimatableInstanceCache().getManagerForId(instanceId);
 
-            if (animatableManager == null)
-                return;
+        if (animatableManager == null)
+            return;
 
-            if (controllerName != null) {
-                animatableManager.stopTriggeredAnimation(controllerName, animName);
-            }
-            else {
-                animatableManager.stopTriggeredAnimation(animName);
-            }
+        if (controllerName != null) {
+            animatableManager.stopTriggeredAnimation(controllerName, animName);
         }
         else {
-            HydraServices.NETWORK.stopTriggeredSingletonAnim(this, relatedEntity, instanceId, controllerName, animName);
+            animatableManager.stopTriggeredAnimation(animName);
         }
     }
 

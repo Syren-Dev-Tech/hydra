@@ -25,6 +25,7 @@ import com.github.syren_dev_tech.hydra.renderer.layer.HydraRenderLayer;
 import com.github.syren_dev_tech.hydra.util.Color;
 import com.github.syren_dev_tech.hydra.util.RenderUtil;
 
+import java.lang.reflect.Method;
 import java.util.List;
 
 // TODO Split sources support
@@ -366,22 +367,87 @@ public interface HydraRenderer<T extends HydraAnimatable> {
         if (isReRender)
             return buffer;
 
-        return switch (buffer) {
-            case BufferBuilder builder when !builder.building -> bufferSource.getBuffer(renderType);
-            case OutlineBufferSource.EntityOutlineGenerator outlines when bufferNeedsRefresh(outlines.delegate()) -> new OutlineBufferSource.EntityOutlineGenerator(bufferSource.getBuffer(renderType), outlines.color());
-            case VertexMultiConsumer.Double pair when bufferNeedsRefresh(pair.first) || bufferNeedsRefresh(pair.second) -> new VertexMultiConsumer.Double(bufferNeedsRefresh(pair.first) ? bufferSource.getBuffer(renderType) : pair.first, bufferNeedsRefresh(pair.second) ? bufferSource.getBuffer(renderType) : pair.second);
-            default -> buffer;
-        };
+        if (buffer instanceof BufferBuilder builder && !isBufferBuilderBuilding(builder))
+            return bufferSource.getBuffer(renderType);
+        if (isOutlineGenerator(buffer) && bufferNeedsRefresh(getOutlineGeneratorDelegate(buffer)))
+            return createOutlineGenerator(bufferSource.getBuffer(renderType), getOutlineGeneratorColor(buffer));
+        return buffer;
     }
 
-    @Deprecated(forRemoval = true)
-    @ApiStatus.Internal
-    private boolean bufferNeedsRefresh(VertexConsumer buffer) {
-        return switch (buffer) {
-            case BufferBuilder builder -> !builder.building;
-            case OutlineBufferSource.EntityOutlineGenerator outlines -> bufferNeedsRefresh(outlines.delegate());
-            case VertexMultiConsumer.Double pair -> bufferNeedsRefresh(pair.first) || bufferNeedsRefresh(pair.second);
-            default -> false;
-        };
+    static final Method BUFFER_BUILDER_BUILDING_METHOD = loadBufferBuilderMethod();
+    static final Class<?> OUTLINE_GENERATOR_CLASS = loadOutlineGeneratorClass();
+    static final java.lang.reflect.Constructor<?> OUTLINE_GENERATOR_CONSTRUCTOR = loadOutlineGeneratorConstructor();
+
+    private static Method loadBufferBuilderMethod() {
+        try {
+            return BufferBuilder.class.getDeclaredMethod("building");
+        } catch (NoSuchMethodException e) {
+            // building() method not available in this version
+            return null;
+        }
+    }
+
+    private static Class<?> loadOutlineGeneratorClass() {
+        try {
+            return Class.forName("net.minecraft.client.renderer.OutlineBufferSource$EntityOutlineGenerator");
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+    }
+
+    private static java.lang.reflect.Constructor<?> loadOutlineGeneratorConstructor() {
+        if (OUTLINE_GENERATOR_CLASS == null)
+            return null;
+        try {
+            return OUTLINE_GENERATOR_CLASS.getDeclaredConstructor(VertexConsumer.class, int.class);
+        } catch (NoSuchMethodException e) {
+            return null;
+        }
+    }
+
+    private static boolean isBufferBuilderBuilding(BufferBuilder builder) {
+        try {
+            if (BUFFER_BUILDER_BUILDING_METHOD != null) {
+                return (boolean) BUFFER_BUILDER_BUILDING_METHOD.invoke(builder);
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static boolean bufferNeedsRefresh(VertexConsumer buffer) {
+        if (buffer instanceof BufferBuilder builder) {
+            return !isBufferBuilderBuilding(builder);
+        }
+        return true;
+    }
+
+    private static boolean isOutlineGenerator(VertexConsumer buffer) {
+        return OUTLINE_GENERATOR_CLASS != null && OUTLINE_GENERATOR_CLASS.isInstance(buffer);
+    }
+
+    private static VertexConsumer getOutlineGeneratorDelegate(VertexConsumer buffer) {
+        try {
+            return (VertexConsumer) OUTLINE_GENERATOR_CLASS.getDeclaredMethod("delegate").invoke(buffer);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static int getOutlineGeneratorColor(VertexConsumer buffer) {
+        try {
+            return (int) OUTLINE_GENERATOR_CLASS.getDeclaredMethod("color").invoke(buffer);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private static VertexConsumer createOutlineGenerator(VertexConsumer delegate, int color) {
+        try {
+            return (VertexConsumer) OUTLINE_GENERATOR_CONSTRUCTOR.newInstance(delegate, color);
+        } catch (Exception e) {
+            return delegate;
+        }
     }
 }

@@ -36,6 +36,7 @@ import com.github.syren_dev_tech.hydra.renderer.layer.HydraRenderLayer;
 import com.github.syren_dev_tech.hydra.renderer.layer.HydraRenderLayersContainer;
 import com.github.syren_dev_tech.hydra.util.Color;
 import com.github.syren_dev_tech.hydra.util.RenderUtil;
+import com.github.syren_dev_tech.hydra.mixin.client.LevelRendererAccessor;
 
 import java.util.List;
 
@@ -331,10 +332,10 @@ public class HydraArmorRenderer<T extends Item & HydraItem> extends HumanoidMode
         }
 
         Minecraft mc = Minecraft.getInstance();
-        MultiBufferSource bufferSource = mc.levelRenderer.renderBuffers.bufferSource();
+        MultiBufferSource bufferSource = ((LevelRendererAccessor) mc.levelRenderer).getRenderBuffers().bufferSource();
 
         if (mc.levelRenderer.shouldShowEntityOutlines() && mc.shouldEntityAppearGlowing(this.currentEntity))
-            bufferSource = mc.levelRenderer.renderBuffers.outlineBufferSource();
+            bufferSource = ((LevelRendererAccessor) mc.levelRenderer).getRenderBuffers().outlineBufferSource();
 
         float partialTick = mc.getTimer().getGameTimeDeltaPartialTick(true);
         RenderType renderType = getRenderType(this.animatable, getTextureLocation(this.animatable), bufferSource, partialTick);
@@ -457,7 +458,7 @@ public class HydraArmorRenderer<T extends Item & HydraItem> extends HumanoidMode
 
         final Minecraft mc = Minecraft.getInstance();
 
-        prepForRender(entity, stack, slot, baseModel, mc.levelRenderer.renderBuffers.bufferSource(), mc.getTimer().getGameTimeDeltaPartialTick(true), 0, 0, 0, 0);
+        prepForRender(entity, stack, slot, baseModel, ((LevelRendererAccessor) mc.levelRenderer).getRenderBuffers().bufferSource(), mc.getTimer().getGameTimeDeltaPartialTick(true), 0, 0, 0, 0);
     }
 
     /**
@@ -655,18 +656,18 @@ public class HydraArmorRenderer<T extends Item & HydraItem> extends HumanoidMode
             return;
 
         if (this.currentSlot == EquipmentSlot.HEAD) {
-            if (this.baseModel.scaleHead) {
-                float headScale = 1.5f / this.baseModel.babyHeadScale;
+            if (this.model.scaleHead) {
+                float headScale = 1.5f / this.model.babyHeadScale;
 
                 poseStack.scale(headScale, headScale, headScale);
             }
 
-            poseStack.translate(0, this.baseModel.babyYHeadOffset / 16f, this.baseModel.babyZHeadOffset / 16f);
+            poseStack.translate(0, this.model.babyYHeadOffset / 16f, this.model.babyZHeadOffset / 16f);
         } else {
-            float bodyScale = 1 / this.baseModel.babyBodyScale;
+            float bodyScale = 1 / this.model.babyBodyScale;
 
             poseStack.scale(bodyScale, bodyScale, bodyScale);
-            poseStack.translate(0, this.baseModel.bodyYOffset / 16f, 0);
+            poseStack.translate(0, this.model.bodyYOffset / 16f, 0);
         }
     }
 
@@ -698,7 +699,7 @@ public class HydraArmorRenderer<T extends Item & HydraItem> extends HumanoidMode
      */
     @Override
     public void fireCompileRenderLayersEvent() {
-        HydraServices.Client.EVENTS.fireCompileArmorRenderLayers(this);
+        HydraServices.Client.getEvents().fireCompileArmorRenderLayers(this);
     }
 
     /**
@@ -708,7 +709,7 @@ public class HydraArmorRenderer<T extends Item & HydraItem> extends HumanoidMode
      */
     @Override
     public boolean firePreRenderEvent(PoseStack poseStack, BakedHydraModel model, MultiBufferSource bufferSource, float partialTick, int packedLight) {
-        return HydraServices.Client.EVENTS.fireArmorPreRender(this, poseStack, model, bufferSource, partialTick, packedLight);
+        return HydraServices.Client.getEvents().fireArmorPreRender(this, poseStack, model, bufferSource, partialTick, packedLight);
     }
 
     /**
@@ -716,6 +717,6 @@ public class HydraArmorRenderer<T extends Item & HydraItem> extends HumanoidMode
      */
     @Override
     public void firePostRenderEvent(PoseStack poseStack, BakedHydraModel model, MultiBufferSource bufferSource, float partialTick, int packedLight) {
-        HydraServices.Client.EVENTS.fireArmorPostRender(this, poseStack, model, bufferSource, partialTick, packedLight);
+        HydraServices.Client.getEvents().fireArmorPostRender(this, poseStack, model, bufferSource, partialTick, packedLight);
     }
 }

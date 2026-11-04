@@ -1,10 +1,10 @@
 buildscript {
     repositories {
+        mavenLocal()
         mavenCentral()
         gradlePluginPortal()
         maven { url = 'https://maven.neoforged.net/releases' }
         maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
-        mavenLocal()
     }
     dependencies {
         classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
@@ -28,22 +28,34 @@ plugins {
 group = mod_group_id
 version = mod_version
 
-// Set temp variable for artifact ID
-def artifact_id = ""
-
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
-    withSourcesJar()
-    withJavadocJar()
 }
 
-def isForge = project.findProperty('forge') == 'true'
-def isFabric = project.findProperty('fabric') == 'true'
-def isNeoForge = project.findProperty('neoforge') == 'true'
+def isForge = project.hasProperty('forge') && project.forge == 'true'
+def isFabric = project.hasProperty('fabric') && project.fabric == 'true'
+def isNeoForge = project.hasProperty('neoforge') && project.neoforge == 'true'
 
-if (isForge) {
+def allBuilds(artifact_id) {
+    println "Using artifact ID" + artifact_id
+
+    artifacts {
+        archives jar
+    }
+
+    publishing {
+        publications {
+            register('mavenJava', MavenPublication) {
+                artifactId "${artifact_id}"
+                artifact jar
+            }
+        }
+    }
+}
+
+def withForge() {
     println "Building with Forge"
 
     apply plugin: 'net.minecraftforge.gradle'
@@ -52,7 +64,6 @@ if (isForge) {
 
     // Exclude files marked as "fabric only"
     sourceSets.main.java.exclude '**/*_Fabric.java'
-    artifact_id = "${mod_id}_forge"
 
     dependencies {
         minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
@@ -72,14 +83,14 @@ if (isForge) {
         }
     }
 }
-else if (isFabric) {
+
+def withFabric() {
     println "Building with Fabric"
 
     apply plugin: 'fabric-loom'
 
     // Exclude files marked as "forge only"
     sourceSets.main.java.exclude '**/*_Forge.java'
-    artifact_id = "${mod_id}_fabric"
 
     dependencies {
         minecraft "com.mojang:minecraft:${minecraft_version}"
@@ -88,7 +99,7 @@ else if (isFabric) {
             parchment("org.parchmentmc.data:parchment-${minecraft_version}:${parchment_version}@zip")
         }
         modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
-        modImplementation "net.fabricmc:fabric-api:${fabric_api_version}"
+        modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
         implementation 'org.slf4j:slf4j-api:2.0.17'
         implementation 'com.electronwill.night-config:core:3.8.3'
         implementation 'org.jspecify:jspecify:0.3.0'
@@ -102,21 +113,16 @@ else if (isFabric) {
         }
     }
 }
-else {
+
+def withNeoForge() {
     println "Building with NeoForge"
 
     apply plugin: 'net.neoforged.moddev'
 
     // Exclude files marked as "fabric only"
     sourceSets.main.java.exclude '**/*_Fabric.java'
-    artifact_id = "${mod_id}_neoforge"
 
     dependencies {
-        implementation("net.neoforged:neoforge:${project.neoforge_version}") {
-            attributes {
-                attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage, Usage.JAVA_API))
-            }
-        }
         implementation 'org.slf4j:slf4j-api:2.0.9'
         implementation 'com.electronwill.night-config:core:3.8.3'
         implementation 'org.jspecify:jspecify:0.3.0'
@@ -135,7 +141,7 @@ else {
         // accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
 
         // Default run configurations.
-        // These can be tweaked, removed, as needed.
+        // These can be tweaked, removed, or duplicated as needed.
         runs {
             client {
                 client()
@@ -195,29 +201,48 @@ else {
         }
     }
 
-    tasks.withType(JavaCompile).configureEach {
-        options.compilerArgs.add("--enable-preview")
-    }
-
     tasks.withType(ProcessResources).configureEach {
         var replaceProperties = [
-            minecraft_version      : minecraft_version,
-            minecraft_version_range: minecraft_version_range,
-            neo_version            : neoforge_version,
-            neo_version_range      : neoforge_version_range,
-            loader_version_range   : neoforge_loader_version_range,
-            mod_id                 : mod_id,
-            mod_name               : mod_name,
-            mod_license            : mod_license,
-            mod_version            : mod_version,
-            mod_authors            : mod_authors,
-            mod_description        : mod_description
+                minecraft_version      : minecraft_version,
+                minecraft_version_range: minecraft_version_range,
+                neo_version            : neoforge_version,
+                neo_version_range      : neoforge_version_range,
+                loader_version_range   : neoforge_loader_version_range,
+                mod_id                 : mod_id,
+                mod_name               : mod_name,
+                mod_license            : mod_license,
+                mod_version            : mod_version,
+                mod_authors            : mod_authors,
+                mod_description        : mod_description
         ]
         inputs.properties replaceProperties
     }
 }
 
+if (isForge) {
+    withForge()
+    allBuilds("${mod_id}_forge")
+} 
+else if (isFabric) {
+    withFabric()
+    allBuilds("${mod_id}_fabric")
+} 
+else if (isNeoForge) {
+    if (minecraft_version == '1.20.1') {
+        withForge()
+    } 
+    else {
+        withNeoForge()
+    }
+    allBuilds("${mod_id}_neoforge")
+}
+else {
+    println "No platform property set. Please specify -Pforge, -Pfabric, or -Pneoforge."
+    throw new GradleException("No platform property set.")
+}
+
 repositories {
+    mavenLocal()
     mavenCentral()
     maven { url 'libraries.minecraft.net' }
     maven { url 'https://maven.minecraftforge.net' }
@@ -225,20 +250,4 @@ repositories {
     maven { url 'https://maven.neoforged.net/' }
     maven { url 'https://maven.fabricmc.net/' }
     maven { url 'https://maven.parchmentmc.org/' }
-}
-
-publishing {
-    publications {
-        register('mavenJava', MavenPublication) {
-            artifactId "${artifact_id}"
-            artifact jar
-        }
-    }
-}
-
-idea {
-    module {
-        downloadSources = true
-        downloadJavadoc = true
-    }
 }

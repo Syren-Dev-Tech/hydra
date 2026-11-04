@@ -5,10 +5,10 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -32,6 +32,8 @@ import com.github.syren_dev_tech.hydra.model.HydraModel;
 import com.github.syren_dev_tech.hydra.renderer.layer.HydraRenderLayer;
 import com.github.syren_dev_tech.hydra.renderer.layer.HydraRenderLayersContainer;
 import com.github.syren_dev_tech.hydra.util.RenderUtil;
+import net.minecraft.client.model.geom.EntityModelSet;
+import com.github.syren_dev_tech.hydra.mixin.client.LevelRendererAccessor;
 
 import java.util.List;
 
@@ -202,7 +204,7 @@ public class HydraItemRenderer<T extends Item & HydraAnimatable> extends BlockEn
     protected void renderInGui(ItemDisplayContext transformType, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay, float partialTick) {
         setupLightingForGuiRender();
 
-        MultiBufferSource.BufferSource defaultBufferSource = bufferSource instanceof MultiBufferSource.BufferSource bufferSource2 ? bufferSource2 : Minecraft.getInstance().levelRenderer.renderBuffers.bufferSource();
+        MultiBufferSource.BufferSource defaultBufferSource = bufferSource instanceof MultiBufferSource.BufferSource bufferSource2 ? bufferSource2 : ((LevelRendererAccessor) Minecraft.getInstance().levelRenderer).getRenderBuffers().bufferSource();
         RenderType renderType = getRenderType(this.animatable, getTextureLocation(this.animatable), defaultBufferSource, partialTick);
         VertexConsumer buffer = ItemRenderer.getFoilBufferDirect(bufferSource, renderType, true, this.currentItemStack != null && this.currentItemStack.hasFoil());
 
@@ -298,7 +300,7 @@ public class HydraItemRenderer<T extends Item & HydraAnimatable> extends BlockEn
      */
     @Override
     public void fireCompileRenderLayersEvent() {
-        HydraServices.Client.EVENTS.fireCompileItemRenderLayers(this);
+        HydraServices.Client.getEvents().fireCompileItemRenderLayers(this);
     }
 
     /**
@@ -308,7 +310,7 @@ public class HydraItemRenderer<T extends Item & HydraAnimatable> extends BlockEn
      */
     @Override
     public boolean firePreRenderEvent(PoseStack poseStack, BakedHydraModel model, MultiBufferSource bufferSource, float partialTick, int packedLight) {
-        return HydraServices.Client.EVENTS.fireItemPreRender(this, poseStack, model, bufferSource, partialTick, packedLight);
+        return HydraServices.Client.getEvents().fireItemPreRender(this, poseStack, model, bufferSource, partialTick, packedLight);
     }
 
     /**
@@ -316,6 +318,6 @@ public class HydraItemRenderer<T extends Item & HydraAnimatable> extends BlockEn
      */
     @Override
     public void firePostRenderEvent(PoseStack poseStack, BakedHydraModel model, MultiBufferSource bufferSource, float partialTick, int packedLight) {
-        HydraServices.Client.EVENTS.fireItemPostRender(this, poseStack, model, bufferSource, partialTick, packedLight);
+        HydraServices.Client.getEvents().fireItemPostRender(this, poseStack, model, bufferSource, partialTick, packedLight);
     }
 }

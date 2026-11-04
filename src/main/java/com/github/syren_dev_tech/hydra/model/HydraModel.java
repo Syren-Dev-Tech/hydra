@@ -41,6 +41,13 @@ public abstract class HydraModel<T extends HydraAnimatable> {
 	private double lastGameTickTime;
 	private long lastRenderedInstance = -1;
 
+	public boolean scaleHead;
+	public float babyHeadScale;
+	public float babyYHeadOffset;
+	public float babyZHeadOffset;
+	public float babyBodyScale;
+	public float bodyYOffset;
+
 	/**
 	 * Returns the resource path for the {@link BakedHydraModel} (model json file) to render based on the provided animatable
 	 */

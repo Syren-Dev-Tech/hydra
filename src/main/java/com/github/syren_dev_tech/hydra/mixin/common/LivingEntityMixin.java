@@ -6,7 +6,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import com.github.syren_dev_tech.hydra.HydraConstants;
+import com.github.syren_dev_tech.hydra.util.ItemStackAnimatableIdHelper;
 
 /**
  * Injection into the equipment change handling to allow for bypassing Hydra ItemStack ID parity
@@ -21,6 +21,6 @@ public class LivingEntityMixin {
      */
     @WrapOperation(method = "equipmentHasChanged", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/ItemStack;matches(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemStack;)Z"))
     public boolean hydra$allowLazyStackIdParity(ItemStack remoteStack, ItemStack localStack, Operation<Boolean> original) {
-        return original.call(remoteStack, localStack) && remoteStack.getOrDefault(HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get(), Integer.MIN_VALUE).equals(localStack.getOrDefault(HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get(), Integer.MIN_VALUE));
+        return original.call(remoteStack, localStack) && ItemStackAnimatableIdHelper.getOrDefault(remoteStack, Integer.MIN_VALUE) == ItemStackAnimatableIdHelper.getOrDefault(localStack, Integer.MIN_VALUE);
     }
 }

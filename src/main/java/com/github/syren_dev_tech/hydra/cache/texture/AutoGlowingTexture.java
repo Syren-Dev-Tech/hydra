@@ -19,7 +19,6 @@ import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.jetbrains.annotations.Nullable;
 import com.github.syren_dev_tech.hydra.HydraConstants;
-import com.github.syren_dev_tech.hydra.HydraServices;
 import com.github.syren_dev_tech.hydra.resource.HydraGlowingTextureMeta;
 
 import java.io.IOException;
@@ -134,7 +133,7 @@ public class AutoGlowingTexture extends HydraAbstractTexture {
 			if (glowLayerMeta != null) {
 				glowLayerMeta.createImageMask(baseImage, glowImage);
 
-				if (PRINT_DEBUG_IMAGES && HydraServices.PLATFORM.isDevelopmentEnvironment()) {
+				if (PRINT_DEBUG_IMAGES) {
 					printDebugImageToDisk(this.textureBase, baseImage);
 					printDebugImageToDisk(this.glowLayer, glowImage);
 				}

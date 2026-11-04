@@ -3,7 +3,6 @@ package com.github.syren_dev_tech.hydra.animatable;
 import net.minecraft.world.entity.Entity;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
-import com.github.syren_dev_tech.hydra.HydraServices;
 import com.github.syren_dev_tech.hydra.animation.AnimationController;
 import com.github.syren_dev_tech.hydra.animation.AnimatableManager;
 import com.github.syren_dev_tech.hydra.constant.dataticket.SerializableDataTicket;
@@ -47,12 +46,8 @@ public interface HydraEntity extends HydraAnimatable {
 	default <D> void setAnimData(SerializableDataTicket<D> dataTicket, D data) {
 		Entity entity = (Entity)this;
 
-		if (entity.level().isClientSide()) {
-			getAnimatableInstanceCache().getManagerForId(entity.getId()).setData(dataTicket, data);
-		}
-		else {
-			HydraServices.NETWORK.syncEntityAnimData(entity, false, dataTicket, data);
-		}
+		// Client-side only
+		getAnimatableInstanceCache().getManagerForId(entity.getId()).setData(dataTicket, data);
 	}
 
 	/**
@@ -69,16 +64,12 @@ public interface HydraEntity extends HydraAnimatable {
 	default void triggerAnim(@Nullable String controllerName, String animName) {
 		Entity entity = (Entity)this;
 
-		if (entity.level().isClientSide()) {
-			if (controllerName != null) {
-				getAnimatableInstanceCache().getManagerForId(entity.getId()).tryTriggerAnimation(controllerName, animName);
-			}
-			else {
-				getAnimatableInstanceCache().getManagerForId(entity.getId()).tryTriggerAnimation(animName);
-			}
+		// Client-side only
+		if (controllerName != null) {
+			getAnimatableInstanceCache().getManagerForId(entity.getId()).tryTriggerAnimation(controllerName, animName);
 		}
 		else {
-			HydraServices.NETWORK.triggerEntityAnim(entity, false, controllerName, animName);
+			getAnimatableInstanceCache().getManagerForId(entity.getId()).tryTriggerAnimation(animName);
 		}
 	}
 
@@ -96,21 +87,17 @@ public interface HydraEntity extends HydraAnimatable {
 	default void stopTriggeredAnim(@Nullable String controllerName, @Nullable String animName) {
 		Entity entity = (Entity)this;
 
-		if (entity.level().isClientSide()) {
-			AnimatableManager<HydraAnimatable> animatableManager = getAnimatableInstanceCache().getManagerForId(entity.getId());
+		// Client-side only
+		AnimatableManager<HydraAnimatable> animatableManager = getAnimatableInstanceCache().getManagerForId(entity.getId());
 
-			if (animatableManager == null)
-				return;
+		if (animatableManager == null)
+			return;
 
-			if (controllerName != null) {
-				animatableManager.stopTriggeredAnimation(controllerName, animName);
-			}
-			else {
-				animatableManager.stopTriggeredAnimation(animName);
-			}
+		if (controllerName != null) {
+			animatableManager.stopTriggeredAnimation(controllerName, animName);
 		}
 		else {
-			HydraServices.NETWORK.stopTriggeredEntityAnim(entity, false, controllerName, animName);
+			animatableManager.stopTriggeredAnimation(animName);
 		}
 	}
 	

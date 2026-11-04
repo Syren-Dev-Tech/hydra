@@ -6,7 +6,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
-import com.github.syren_dev_tech.hydra.HydraConstants;
+import com.github.syren_dev_tech.hydra.util.ItemStackAnimatableIdHelper;
 
 /**
  * Injection into the base container functionality to handle ItemStack duplication and splitting with Hydra stack identifiers
@@ -20,8 +20,8 @@ public class AbstractContainerMenuMixin {
     public ItemStack hydra$removeHydraIdOnCopy(ItemStack instance, int count, Operation<ItemStack> original) {
         ItemStack copy = original.call(instance, count);
 
-        if (copy.has(HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get()))
-            copy.remove(HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get());
+        if (ItemStackAnimatableIdHelper.hasId(copy))
+            ItemStackAnimatableIdHelper.removeId(copy);
 
         return copy;
     }
@@ -31,7 +31,7 @@ public class AbstractContainerMenuMixin {
      */
     @WrapOperation(method = "synchronizeSlotToRemote", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/ItemStack;matches(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemStack;)Z"))
     public boolean hydra$forceHydraIdSync(ItemStack stack, ItemStack other, Operation<Boolean> original) {
-        return original.call(stack, other) && stack.getOrDefault(HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get(), -1).equals(other.getOrDefault(HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get(), -1));
+        return original.call(stack, other) && ItemStackAnimatableIdHelper.getOrDefault(stack, -1L) == ItemStackAnimatableIdHelper.getOrDefault(other, -1L);
     }
 
     /**
@@ -39,6 +39,6 @@ public class AbstractContainerMenuMixin {
      */
     @WrapOperation(method = "triggerSlotListeners", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/item/ItemStack;matches(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemStack;)Z"))
     public boolean hydra$forceHydraSlotChange(ItemStack stack, ItemStack other, Operation<Boolean> original) {
-        return original.call(stack, other) && stack.getOrDefault(HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get(), -1).equals(other.getOrDefault(HydraConstants.STACK_ANIMATABLE_ID_COMPONENT.get(), -1));
+        return original.call(stack, other) && ItemStackAnimatableIdHelper.getOrDefault(stack, -1L) == ItemStackAnimatableIdHelper.getOrDefault(other, -1L);
     }
 }

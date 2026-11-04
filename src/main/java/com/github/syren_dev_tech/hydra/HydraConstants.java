@@ -1,13 +1,8 @@
 package com.github.syren_dev_tech.hydra;
 
-import com.mojang.serialization.Codec;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import java.util.function.Supplier;
 
 /**
  * Holder class for several properties and/or handlers inherent to Hydra
@@ -16,9 +11,9 @@ public final class HydraConstants {
     public static final Logger LOGGER = LogManager.getLogger("Hydra");
     public static final String MODID = "hydra";
 
-    public static final Supplier<DataComponentType<Long>> STACK_ANIMATABLE_ID_COMPONENT = HydraServices.PLATFORM.registerDataComponent("stack_animatable_id", builder -> builder.persistent(Codec.LONG).networkSynchronized(ByteBufCodecs.VAR_LONG));
-
-    public static void init() {}
+    public static void init() {
+        // Initialization complete
+    }
 
     /**
      * Helper method to create a ResourceLocation predefined with Hydra's {@link #MODID}

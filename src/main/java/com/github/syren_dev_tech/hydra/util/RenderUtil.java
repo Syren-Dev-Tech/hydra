@@ -10,7 +10,11 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.geom.ModelPart;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
 import net.minecraft.client.renderer.texture.AbstractTexture;
+
+import java.lang.reflect.Field;
+import java.util.Map;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -38,6 +42,45 @@ import com.github.syren_dev_tech.hydra.renderer.HydraReplacedEntityRenderer;
  * Helper class for various methods and functions useful while rendering
  */
 public final class RenderUtil {
+    /**
+     * Safely retrieves an EntityRenderer for a given EntityType using reflection
+     * <p>
+     * This is needed because the renderers map is private in EntityRenderDispatcher
+     */
+    @Nullable
+    private static EntityRenderer<?> getEntityRendererForType(EntityType<?> entityType) {
+        try {
+            EntityRenderDispatcher dispatcher = Minecraft.getInstance().getEntityRenderDispatcher();
+            Field renderersField = EntityRenderDispatcher.class.getDeclaredField("renderers");
+            renderersField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<EntityType<?>, EntityRenderer<?>> renderers = (Map<EntityType<?>, EntityRenderer<?>>) renderersField.get(dispatcher);
+            return renderers.get(entityType);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            HydraConstants.LOGGER.warn("Failed to retrieve entity renderer for type {}", entityType, e);
+            return null;
+        }
+    }
+
+    /**
+     * Safely retrieves the first Cube from a ModelPart using reflection
+     * <p>
+     * This is needed because the cubes field is private in ModelPart
+     */
+    @Nullable
+    public static ModelPart.Cube getFirstCubeFromModelPart(ModelPart modelPart) {
+        try {
+            Field cubesField = ModelPart.class.getDeclaredField("cubes");
+            cubesField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            java.util.List<ModelPart.Cube> cubes = (java.util.List<ModelPart.Cube>) cubesField.get(modelPart);
+            return cubes.isEmpty() ? null : cubes.get(0);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            HydraConstants.LOGGER.warn("Failed to retrieve first cube from ModelPart", e);
+            return null;
+        }
+    }
+
     public static void translateMatrixToBone(PoseStack poseStack, HydraBone bone) {
         poseStack.translate(-bone.getPosX() / 16f, bone.getPosY() / 16f, bone.getPosZ() / 16f);
     }
@@ -289,7 +332,7 @@ public final class RenderUtil {
      */
     @Nullable
     public static HydraModel<?> getHydraModelForEntityType(EntityType<?> entityType) {
-        EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(entityType);
+        EntityRenderer<?> renderer = getEntityRendererForType(entityType);
 
         return renderer instanceof HydraRenderer<?> hydraRenderer ? hydraRenderer.getHydraModel() : null;
     }
@@ -302,7 +345,7 @@ public final class RenderUtil {
      */
     @Nullable
     public static HydraAnimatable getReplacedAnimatable(EntityType<?> entityType) {
-        EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(entityType);
+        EntityRenderer<?> renderer = getEntityRendererForType(entityType);
 
         return renderer instanceof HydraReplacedEntityRenderer<?, ?> replacedEntityRenderer ? replacedEntityRenderer.getAnimatable() : null;
     }
@@ -336,7 +379,7 @@ public final class RenderUtil {
      */
     @Nullable
     public static HydraModel<?> getHydraModelForItem(ItemStack item) {
-        return HydraServices.Client.ITEM_RENDERING.getHydraModelForItem(item);
+        return HydraServices.Client.getItemRendering().getHydraModelForItem(item);
     }
 
     /**
@@ -368,6 +411,6 @@ public final class RenderUtil {
      */
     @Nullable
     public static HydraModel<?> getHydraModelForArmor(ItemStack stack) {
-        return HydraServices.Client.ITEM_RENDERING.getHydraModelForArmor(stack);
+        return HydraServices.Client.getItemRendering().getHydraModelForArmor(stack);
     }
 }

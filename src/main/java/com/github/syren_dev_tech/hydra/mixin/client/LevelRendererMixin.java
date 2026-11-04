@@ -5,9 +5,12 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.RenderBuffers;
 import org.joml.Matrix4f;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -18,7 +21,7 @@ import com.github.syren_dev_tech.hydra.loading.math.MolangQueries;
  * Capture pre-render data for Molang queries
  */
 @Mixin(LevelRenderer.class)
-public class LevelRendererMixin {
+public abstract class LevelRendererMixin {
     @Shadow
     private int renderedEntities;
 

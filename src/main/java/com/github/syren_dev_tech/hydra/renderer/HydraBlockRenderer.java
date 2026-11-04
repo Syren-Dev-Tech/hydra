@@ -39,18 +39,18 @@ import java.util.List;
  * All blocks added to be rendered by Hydra should use an instance of this class.
  */
 public class HydraBlockRenderer<T extends BlockEntity & HydraAnimatable> implements HydraRenderer<T>, BlockEntityRenderer<T> {
-	@SuppressWarnings("unchecked")
-	protected static final EnumProperty<Direction>[] SUPPORTED_DIRECTION_PROPERTIES = new EnumProperty[] {BlockStateProperties.FACING, BlockStateProperties.HORIZONTAL_FACING, BlockStateProperties.VERTICAL_DIRECTION, BlockStateProperties.FACING_HOPPER };
+    @SuppressWarnings("unchecked")
+    protected static final EnumProperty<Direction>[] SUPPORTED_DIRECTION_PROPERTIES = new EnumProperty[] {BlockStateProperties.FACING, BlockStateProperties.HORIZONTAL_FACING, BlockStateProperties.VERTICAL_DIRECTION, BlockStateProperties.FACING_HOPPER};
 
-	protected final HydraRenderLayersContainer<T> renderLayers = new HydraRenderLayersContainer<>(this);
-	protected final HydraModel<T> model;
+    protected final HydraRenderLayersContainer<T> renderLayers = new HydraRenderLayersContainer<>(this);
+    protected final HydraModel<T> model;
 
-	protected T animatable;
-	protected float scaleWidth = 1;
-	protected float scaleHeight = 1;
+    protected T animatable;
+    protected float scaleWidth = 1;
+    protected float scaleHeight = 1;
 
-	protected Matrix4f blockRenderTranslations = new Matrix4f();
-	protected Matrix4f modelRenderTranslations = new Matrix4f();
+    protected Matrix4f blockRenderTranslations = new Matrix4f();
+    protected Matrix4f modelRenderTranslations = new Matrix4f();
 
     /**
      * Creates a new defaulted renderer instance, using the blockentity's registered id as the file name for its assets
@@ -59,231 +59,226 @@ public class HydraBlockRenderer<T extends BlockEntity & HydraAnimatable> impleme
         this(new DefaultedBlockHydraModel<>(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntityType)));
     }
 
-	public HydraBlockRenderer(HydraModel<T> model) {
-		this.model = model;
-	}
+    public HydraBlockRenderer(HydraModel<T> model) {
+        this.model = model;
+    }
 
-	/**
-	 * Gets the model instance for this renderer
-	 */
-	@Override
-	public HydraModel<T> getHydraModel() {
-		return this.model;
-	}
+    /**
+     * Gets the model instance for this renderer
+     */
+    @Override
+    public HydraModel<T> getHydraModel() {
+        return this.model;
+    }
 
-	/**
-	 * Gets the {@link HydraAnimatable} instance currently being rendered
-	 */
-	@Override
-	public T getAnimatable() {
-		return this.animatable;
-	}
+    /**
+     * Gets the {@link HydraAnimatable} instance currently being rendered
+     */
+    @Override
+    public T getAnimatable() {
+        return this.animatable;
+    }
 
-	/**
-	 * Gets the id that represents the current animatable's instance for animation purposes
-	 * <p>
-	 * This is mostly useful for things like items, which have a single registered instance for all objects
-	 */
-	@Override
-	public long getInstanceId(T animatable) {
-		return animatable.getBlockPos().hashCode();
-	}
+    /**
+     * Gets the id that represents the current animatable's instance for animation purposes
+     * <p>
+     * This is mostly useful for things like items, which have a single registered instance for all objects
+     */
+    @Override
+    public long getInstanceId(T animatable) {
+        return animatable.getBlockPos().hashCode();
+    }
 
-	/**
-	 * Returns the list of registered {@link HydraRenderLayer HydraRenderLayers} for this renderer
-	 */
-	@Override
-	public List<HydraRenderLayer<T>> getRenderLayers() {
-		return this.renderLayers.getRenderLayers();
-	}
+    /**
+     * Returns the list of registered {@link HydraRenderLayer HydraRenderLayers} for this renderer
+     */
+    @Override
+    public List<HydraRenderLayer<T>> getRenderLayers() {
+        return this.renderLayers.getRenderLayers();
+    }
 
-	/**
-	 * Adds a {@link HydraRenderLayer} to this renderer, to be called after the main model is rendered each frame
-	 */
-	public HydraBlockRenderer<T> addRenderLayer(HydraRenderLayer<T> renderLayer) {
-		this.renderLayers.addLayer(renderLayer);
+    /**
+     * Adds a {@link HydraRenderLayer} to this renderer, to be called after the main model is rendered each frame
+     */
+    public HydraBlockRenderer<T> addRenderLayer(HydraRenderLayer<T> renderLayer) {
+        this.renderLayers.addLayer(renderLayer);
 
-		return this;
-	}
+        return this;
+    }
 
-	/**
-	 * Sets a scale override for this renderer, telling Hydra to pre-scale the model
-	 */
-	public HydraBlockRenderer<T> withScale(float scale) {
-		return withScale(scale, scale);
-	}
+    /**
+     * Sets a scale override for this renderer, telling Hydra to pre-scale the model
+     */
+    public HydraBlockRenderer<T> withScale(float scale) {
+        return withScale(scale, scale);
+    }
 
-	/**
-	 * Sets a scale override for this renderer, telling Hydra to pre-scale the model
-	 */
-	public HydraBlockRenderer<T> withScale(float scaleWidth, float scaleHeight) {
-		this.scaleWidth = scaleWidth;
-		this.scaleHeight = scaleHeight;
+    /**
+     * Sets a scale override for this renderer, telling Hydra to pre-scale the model
+     */
+    public HydraBlockRenderer<T> withScale(float scaleWidth, float scaleHeight) {
+        this.scaleWidth = scaleWidth;
+        this.scaleHeight = scaleHeight;
 
-		return this;
-	}
+        return this;
+    }
 
-	/**
-	 * Called before rendering the model to buffer. Allows for render modifications and preparatory work such as scaling and translating
-	 * <p>
-	 * {@link PoseStack} translations made here are kept until the end of the render process
-	 */
-	@Override
-	public void preRender(PoseStack poseStack, T animatable, BakedHydraModel model, @Nullable MultiBufferSource bufferSource, @Nullable VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight, int packedOverlay, int colour) {
-		this.blockRenderTranslations = new Matrix4f(poseStack.last().pose());
+    /**
+     * Called before rendering the model to buffer. Allows for render modifications and preparatory work such as scaling and translating
+     * <p>
+     * {@link PoseStack} translations made here are kept until the end of the render process
+     */
+    @Override
+    public void preRender(PoseStack poseStack, T animatable, BakedHydraModel model, @Nullable MultiBufferSource bufferSource, @Nullable VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight, int packedOverlay, int colour) {
+        this.blockRenderTranslations = new Matrix4f(poseStack.last().pose());
 
-		if (!isReRender)
-			poseStack.translate(0.5, 0, 0.5);
+        if (!isReRender)
+            poseStack.translate(0.5, 0, 0.5);
 
-		scaleModelForRender(this.scaleWidth, this.scaleHeight, poseStack, animatable, model, isReRender, partialTick, packedLight, packedOverlay);
-	}
+        scaleModelForRender(this.scaleWidth, this.scaleHeight, poseStack, animatable, model, isReRender, partialTick, packedLight, packedOverlay);
+    }
 
-	@Override
-	@ApiStatus.Internal
-	public void render(T animatable, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource,
-			int packedLight, int packedOverlay) {
-		this.animatable = animatable;
+    @Override
+    @ApiStatus.Internal
+    public void render(T animatable, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, int packedLight, int packedOverlay) {
+        this.animatable = animatable;
 
-		defaultRender(poseStack, this.animatable, bufferSource, null, null, 0, partialTick, packedLight);
-	}
+        defaultRender(poseStack, this.animatable, bufferSource, null, null, 0, partialTick, packedLight);
+    }
 
-	/**
-	 * The actual render method that subtype renderers should override to handle their specific rendering tasks
-	 * <p>
-	 * {@link HydraRenderer#preRender} has already been called by this stage, and {@link HydraRenderer#postRender} will be called directly after
-	 */
-	@Override
-	public void actuallyRender(PoseStack poseStack, T animatable, BakedHydraModel model, @Nullable RenderType renderType,
-							   MultiBufferSource bufferSource, @Nullable VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight,
-							   int packedOverlay, int colour) {
-		if (!isReRender) {
-			AnimationState<T> animationState = new AnimationState<T>(animatable, 0, 0, partialTick, false);
-			long instanceId = getInstanceId(animatable);
-			HydraModel<T> currentModel = getHydraModel();
+    /**
+     * The actual render method that subtype renderers should override to handle their specific rendering tasks
+     * <p>
+     * {@link HydraRenderer#preRender} has already been called by this stage, and {@link HydraRenderer#postRender} will be called directly after
+     */
+    @Override
+    public void actuallyRender(PoseStack poseStack, T animatable, BakedHydraModel model, @Nullable RenderType renderType, MultiBufferSource bufferSource, @Nullable VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight, int packedOverlay, int colour) {
+        if (!isReRender) {
+            AnimationState<T> animationState = new AnimationState<T>(animatable, 0, 0, partialTick, false);
+            long instanceId = getInstanceId(animatable);
+            HydraModel<T> currentModel = getHydraModel();
 
-			animationState.setData(DataTickets.TICK, animatable.getTick(animatable));
-			animationState.setData(DataTickets.BLOCK_ENTITY, animatable);
-			currentModel.addAdditionalStateData(animatable, instanceId, animationState::setData);
-			rotateBlock(getFacing(animatable), poseStack);
-			currentModel.handleAnimations(animatable, instanceId, animationState, partialTick);
-		}
+            animationState.setData(DataTickets.TICK, animatable.getTick(animatable));
+            animationState.setData(DataTickets.BLOCK_ENTITY, animatable);
+            currentModel.addAdditionalStateData(animatable, instanceId, animationState::setData);
+            rotateBlock(getFacing(animatable), poseStack);
+            currentModel.handleAnimations(animatable, instanceId, animationState, partialTick);
+        }
 
-		this.modelRenderTranslations = new Matrix4f(poseStack.last().pose());
+        this.modelRenderTranslations = new Matrix4f(poseStack.last().pose());
 
-		if (buffer != null)
-			HydraRenderer.super.actuallyRender(poseStack, animatable, model, renderType, bufferSource, buffer, isReRender, partialTick,
-					packedLight, packedOverlay, colour);
-	}
+        if (buffer != null)
+            HydraRenderer.super.actuallyRender(poseStack, animatable, model, renderType, bufferSource, buffer, isReRender, partialTick, packedLight, packedOverlay, colour);
+    }
 
-	/**
-	 * Called after all render operations are completed and the render pass is considered functionally complete.
-	 * <p>
-	 * Use this method to clean up any leftover persistent objects stored during rendering or any other post-render maintenance tasks as required
-	 */
-	@Override
-	public void doPostRenderCleanup() {
-		this.animatable = null;
-	}
+    /**
+     * Called after all render operations are completed and the render pass is considered functionally complete.
+     * <p>
+     * Use this method to clean up any leftover persistent objects stored during rendering or any other post-render maintenance tasks as required
+     */
+    @Override
+    public void doPostRenderCleanup() {
+        this.animatable = null;
+    }
 
-	/**
-	 * Renders the provided {@link HydraBone} and its associated child bones
-	 */
-	@Override
-	public void renderRecursively(PoseStack poseStack, T animatable, HydraBone bone, RenderType renderType, MultiBufferSource bufferSource, VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight,
-								  int packedOverlay, int colour) {
-		poseStack.pushPose();
-		RenderUtil.translateMatrixToBone(poseStack, bone);
-		RenderUtil.translateToPivotPoint(poseStack, bone);
-		RenderUtil.rotateMatrixAroundBone(poseStack, bone);
-		RenderUtil.scaleMatrixForBone(poseStack, bone);
-		
-		if (bone.isTrackingMatrices()) {
-			Matrix4f poseState = new Matrix4f(poseStack.last().pose());
-			Matrix4f localMatrix = RenderUtil.invertAndMultiplyMatrices(poseState, this.blockRenderTranslations);
-			Matrix4f worldState = new Matrix4f(localMatrix);
-			BlockPos pos = this.animatable.getBlockPos();
+    /**
+     * Renders the provided {@link HydraBone} and its associated child bones
+     */
+    @Override
+    public void renderRecursively(PoseStack poseStack, T animatable, HydraBone bone, RenderType renderType, MultiBufferSource bufferSource, VertexConsumer buffer, boolean isReRender, float partialTick, int packedLight, int packedOverlay, int colour) {
+        poseStack.pushPose();
+        RenderUtil.translateMatrixToBone(poseStack, bone);
+        RenderUtil.translateToPivotPoint(poseStack, bone);
+        RenderUtil.rotateMatrixAroundBone(poseStack, bone);
+        RenderUtil.scaleMatrixForBone(poseStack, bone);
 
-			bone.setModelSpaceMatrix(RenderUtil.invertAndMultiplyMatrices(poseState, this.modelRenderTranslations));
-			bone.setLocalSpaceMatrix(localMatrix);
-			bone.setWorldSpaceMatrix(worldState.translate(new Vector3f(pos.getX(), pos.getY(), pos.getZ())));
-		}
-		
-		RenderUtil.translateAwayFromPivotPoint(poseStack, bone);
-		
-		buffer = checkAndRefreshBuffer(isReRender, buffer, bufferSource, renderType);
-		
-		renderCubesOfBone(poseStack, bone, buffer, packedLight, packedOverlay, colour);
-		
-		if (!isReRender)
-			applyRenderLayersForBone(poseStack, getAnimatable(), bone, renderType, bufferSource, buffer, partialTick, packedLight, packedOverlay);
-		
-		renderChildBones(poseStack, animatable, bone, renderType, bufferSource, buffer, isReRender, partialTick, packedLight, packedOverlay, colour);
-		poseStack.popPose();
-	}
+        if (bone.isTrackingMatrices()) {
+            Matrix4f poseState = new Matrix4f(poseStack.last().pose());
+            Matrix4f localMatrix = RenderUtil.invertAndMultiplyMatrices(poseState, this.blockRenderTranslations);
+            Matrix4f worldState = new Matrix4f(localMatrix);
+            BlockPos pos = this.animatable.getBlockPos();
 
-	/**
-	 * Rotate the {@link PoseStack} based on the determined {@link Direction} the block is facing
-	 */
-	protected void rotateBlock(Direction facing, PoseStack poseStack) {
-		switch (facing) {
-			case SOUTH -> poseStack.mulPose(Axis.YP.rotationDegrees(180));
-			case WEST -> poseStack.mulPose(Axis.YP.rotationDegrees(90));
-			case NORTH -> poseStack.mulPose(Axis.YP.rotationDegrees(0));
-			case EAST -> poseStack.mulPose(Axis.YP.rotationDegrees(270));
-			case UP -> poseStack.mulPose(Axis.XP.rotationDegrees(90));
-			case DOWN -> poseStack.mulPose(Axis.XN.rotationDegrees(90));
-		}
-	}
+            bone.setModelSpaceMatrix(RenderUtil.invertAndMultiplyMatrices(poseState, this.modelRenderTranslations));
+            bone.setLocalSpaceMatrix(localMatrix);
+            bone.setWorldSpaceMatrix(worldState.translate(new Vector3f(pos.getX(), pos.getY(), pos.getZ())));
+        }
 
-	/**
-	 * Attempt to extract a direction from the block so that the model can be oriented correctly
-	 */
-	protected Direction getFacing(T block) {
-		BlockState blockState = block.getBlockState();
+        RenderUtil.translateAwayFromPivotPoint(poseStack, bone);
 
-		for (EnumProperty<Direction> property : SUPPORTED_DIRECTION_PROPERTIES) {
-			if (blockState.hasProperty(property))
-				return blockState.getValue(property);
-		}
+        buffer = checkAndRefreshBuffer(isReRender, buffer, bufferSource, renderType);
 
-		return Direction.NORTH;
-	}
+        renderCubesOfBone(poseStack, bone, buffer, packedLight, packedOverlay, colour);
 
-	/**
-	 * Update the current frame of a {@link AnimatableTexture potentially animated} texture used by this HydraRenderer
-	 * <p>
-	 * This should only be called immediately prior to rendering
-	 *
-	 * @see AnimatableTexture#setAndUpdate
-	 */
-	@Override
-	public void updateAnimatedTextureFrame(T animatable) {
-		AnimatableTexture.setAndUpdate(getTextureLocation(animatable));
-	}
+        if (!isReRender)
+            applyRenderLayersForBone(poseStack, getAnimatable(), bone, renderType, bufferSource, buffer, partialTick, packedLight, packedOverlay);
 
-	/**
-	 * Create and fire the relevant {@code CompileLayers} event hook for this renderer
-	 */
-	@Override
-	public void fireCompileRenderLayersEvent() {
-		HydraServices.Client.EVENTS.fireCompileBlockRenderLayers(this);
-	}
+        renderChildBones(poseStack, animatable, bone, renderType, bufferSource, buffer, isReRender, partialTick, packedLight, packedOverlay, colour);
+        poseStack.popPose();
+    }
 
-	/**
-	 * Create and fire the relevant {@code Pre-Render} event hook for this renderer
-	 *
-	 * @return Whether the renderer should proceed based on the cancellation state of the event
-	 */
-	@Override
-	public boolean firePreRenderEvent(PoseStack poseStack, BakedHydraModel model, MultiBufferSource bufferSource, float partialTick, int packedLight) {
-		return HydraServices.Client.EVENTS.fireBlockPreRender(this, poseStack, model, bufferSource, partialTick, packedLight);
-	}
+    /**
+     * Rotate the {@link PoseStack} based on the determined {@link Direction} the block is facing
+     */
+    protected void rotateBlock(Direction facing, PoseStack poseStack) {
+        switch (facing) {
+            case SOUTH -> poseStack.mulPose(Axis.YP.rotationDegrees(180));
+            case WEST -> poseStack.mulPose(Axis.YP.rotationDegrees(90));
+            case NORTH -> poseStack.mulPose(Axis.YP.rotationDegrees(0));
+            case EAST -> poseStack.mulPose(Axis.YP.rotationDegrees(270));
+            case UP -> poseStack.mulPose(Axis.XP.rotationDegrees(90));
+            case DOWN -> poseStack.mulPose(Axis.XN.rotationDegrees(90));
+        }
+    }
 
-	/**
-	 * Create and fire the relevant {@code Post-Render} event hook for this renderer
-	 */
-	@Override
-	public void firePostRenderEvent(PoseStack poseStack, BakedHydraModel model, MultiBufferSource bufferSource, float partialTick, int packedLight) {
-		HydraServices.Client.EVENTS.fireBlockPostRender(this, poseStack, model, bufferSource, partialTick, packedLight);
-	}
+    /**
+     * Attempt to extract a direction from the block so that the model can be oriented correctly
+     */
+    protected Direction getFacing(T block) {
+        BlockState blockState = block.getBlockState();
+
+        for (EnumProperty<Direction> property : SUPPORTED_DIRECTION_PROPERTIES) {
+            if (blockState.hasProperty(property))
+                return blockState.getValue(property);
+        }
+
+        return Direction.NORTH;
+    }
+
+    /**
+     * Update the current frame of a {@link AnimatableTexture potentially animated} texture used by this HydraRenderer
+     * <p>
+     * This should only be called immediately prior to rendering
+     *
+     * @see AnimatableTexture#setAndUpdate
+     */
+    @Override
+    public void updateAnimatedTextureFrame(T animatable) {
+        AnimatableTexture.setAndUpdate(getTextureLocation(animatable));
+    }
+
+    /**
+     * Create and fire the relevant {@code CompileLayers} event hook for this renderer
+     */
+    @Override
+    public void fireCompileRenderLayersEvent() {
+        HydraServices.Client.getEvents().fireCompileBlockRenderLayers(this);
+    }
+
+    /**
+     * Create and fire the relevant {@code Pre-Render} event hook for this renderer
+     *
+     * @return Whether the renderer should proceed based on the cancellation state of the event
+     */
+    @Override
+    public boolean firePreRenderEvent(PoseStack poseStack, BakedHydraModel model, MultiBufferSource bufferSource, float partialTick, int packedLight) {
+        return HydraServices.Client.getEvents().fireBlockPreRender(this, poseStack, model, bufferSource, partialTick, packedLight);
+    }
+
+    /**
+     * Create and fire the relevant {@code Post-Render} event hook for this renderer
+     */
+    @Override
+    public void firePostRenderEvent(PoseStack poseStack, BakedHydraModel model, MultiBufferSource bufferSource, float partialTick, int packedLight) {
+        HydraServices.Client.getEvents().fireBlockPostRender(this, poseStack, model, bufferSource, partialTick, packedLight);
+    }
 }

@@ -1,11 +1,8 @@
 package com.github.syren_dev_tech.hydra.animatable.stateless;
 
 import net.minecraft.world.entity.Entity;
-import com.github.syren_dev_tech.hydra.HydraServices;
 import com.github.syren_dev_tech.hydra.animatable.HydraReplacedEntity;
 import com.github.syren_dev_tech.hydra.animation.RawAnimation;
-import com.github.syren_dev_tech.hydra.network.packet.StatelessEntityPlayAnimPacket;
-import com.github.syren_dev_tech.hydra.network.packet.StatelessEntityStopAnimPacket;
 
 /**
  * Extension of {@link StatelessAnimatable} for {@link HydraReplacedEntity} animatables
@@ -55,21 +52,13 @@ public interface StatelessHydraReplacedEntity extends StatelessHydraSingletonAni
 
     @Override
     default void playAnimation(RawAnimation animation, Entity relatedEntity, long instanceId) {
-        if (relatedEntity.level().isClientSide) {
-            handleClientAnimationPlay(this, instanceId, animation);
-        }
-        else {
-            HydraServices.NETWORK.sendToAllPlayersTrackingEntity(new StatelessEntityPlayAnimPacket((int)instanceId, true, animation), relatedEntity);
-        }
+        // Client-side only animation handling
+        handleClientAnimationPlay(this, instanceId, animation);
     }
 
     @Override
     default void stopAnimation(String animation, Entity relatedEntity, long instanceId) {
-        if (relatedEntity.level().isClientSide) {
-            handleClientAnimationStop(this, instanceId, animation);
-        }
-        else {
-            HydraServices.NETWORK.sendToAllPlayersTrackingEntity(new StatelessEntityStopAnimPacket((int)instanceId, true, animation), relatedEntity);
-        }
+        // Client-side only animation handling
+        handleClientAnimationStop(this, instanceId, animation);
     }
 }

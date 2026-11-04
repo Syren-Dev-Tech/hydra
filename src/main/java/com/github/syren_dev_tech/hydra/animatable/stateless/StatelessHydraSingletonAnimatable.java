@@ -1,11 +1,8 @@
 package com.github.syren_dev_tech.hydra.animatable.stateless;
 
 import net.minecraft.world.entity.Entity;
-import com.github.syren_dev_tech.hydra.HydraServices;
 import com.github.syren_dev_tech.hydra.animatable.SingletonHydraAnimatable;
 import com.github.syren_dev_tech.hydra.animation.RawAnimation;
-import com.github.syren_dev_tech.hydra.network.packet.StatelessSingletonPlayAnimPacket;
-import com.github.syren_dev_tech.hydra.network.packet.StatelessSingletonStopAnimPacket;
 import com.github.syren_dev_tech.hydra.util.HydraUtil;
 
 /**
@@ -46,24 +43,16 @@ public non-sealed interface StatelessHydraSingletonAnimatable extends StatelessA
      * Start or continue a pre-defined animation
      */
     default void playAnimation(RawAnimation animation, Entity relatedEntity, long instanceId) {
-        if (relatedEntity.level().isClientSide) {
-            handleClientAnimationPlay(this, instanceId, animation);
-        }
-        else {
-            HydraServices.NETWORK.sendToAllPlayersTrackingEntity(new StatelessSingletonPlayAnimPacket(HydraUtil.getSyncedSingletonAnimatableId(this), instanceId, animation), relatedEntity);
-        }
+        // Client-side only animation handling
+        handleClientAnimationPlay(this, instanceId, animation);
     }
 
     /**
      * Stop an already-playing animation
      */
     default void stopAnimation(String animation, Entity relatedEntity, long instanceId) {
-        if (relatedEntity.level().isClientSide) {
-            handleClientAnimationStop(this, instanceId, animation);
-        }
-        else {
-            HydraServices.NETWORK.sendToAllPlayersTrackingEntity(new StatelessSingletonStopAnimPacket(HydraUtil.getSyncedSingletonAnimatableId(this), instanceId, animation), relatedEntity);
-        }
+        // Client-side only animation handling
+        handleClientAnimationStop(this, instanceId, animation);
     }
 
     // Unsupported method handlers below; do not use
